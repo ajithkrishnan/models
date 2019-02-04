@@ -39,6 +39,7 @@ from absl import app
 from absl import flags
 from absl import logging
 import model
+import reader
 import numpy as np
 import tensorflow as tf
 import util
@@ -74,6 +75,8 @@ FLAGS = flags.FLAGS
 # Maximum number of checkpoints to keep.
 MAX_TO_KEEP = 100
 
+NUM_SCALES = 4
+
 
 def main(_):
   # Fixed seed for repeatability
@@ -102,13 +105,27 @@ def main(_):
                             seq_length=FLAGS.seq_length,
                             legacy_mode=FLAGS.legacy_mode)
 
+  # creating an instance of DataReader to obtain the necessary image_stacks
+  # which can then be passed to the session in the feed_dict
+  train_model.reader = reader.DataReader(train_model.data_dir, train_model.batch_size,
+                                      train_model.img_height, train_model.img_width,
+                                      train_model.seq_length, NUM_SCALES)
+
+  # returns the training image stack
+  (image_stack_training, _, _) = (train_model.reader.read_data('train')) 
+  #print(image_stack_train)
+
+  # Returns the validation image stack
+  (image_stack_validation, _, _) = (train_model.reader.read_data('val'))
+
   train(train_model, FLAGS.pretrained_ckpt, FLAGS.checkpoint_dir,
-        FLAGS.train_steps, FLAGS.summary_freq)
+        FLAGS.train_steps, FLAGS.summary_freq, image_stack_training, image_stack_validation)
 
 
 def train(train_model, pretrained_ckpt, checkpoint_dir, train_steps,
-          summary_freq):
+          summary_freq, image_stack_train, image_stack_val):
   """Train model."""
+  best_val_loss = 10
   if pretrained_ckpt is not None:
     vars_to_restore = util.get_vars_to_restore(pretrained_ckpt)
     pretrain_restorer = tf.train.Saver(vars_to_restore)
@@ -128,41 +145,62 @@ def train(train_model, pretrained_ckpt, checkpoint_dir, train_steps,
     logging.info('Last checkpoint found: %s', checkpoint)
     if checkpoint:
       saver.restore(sess, checkpoint)
-
+      
     logging.info('Training...')
     start_time = time.time()
     last_summary_time = time.time()
     steps_per_epoch = train_model.reader.steps_per_epoch
     step = 1
     while step <= train_steps:
+      train_model.image_stack = image_stack_train
+
       fetches = {
           'train': train_model.train_op,
           'global_step': train_model.global_step,
           'incr_global_step': train_model.incr_global_step
-      }
+      }     
 
       if step % summary_freq == 0:
-        fetches['loss'] = train_model.total_loss
+        fetches['loss'] = train_model.total_loss        
         fetches['summary'] = sv.summary_op
 
+      #results = sess.run(fetches, feed_dict={train_model.image_stack: image_stack_train})      
       results = sess.run(fetches)
+      
       global_step = results['global_step']
 
       if step % summary_freq == 0:
+        train_model.image_stack = image_stack_val
+        fetches_val = {
+          'validation_loss': train_model.total_loss,
+        }
+        results_val, validation_summary = sess.run([fetches_val, train_model.validation_loss])
+        
+
+      if step % summary_freq == 0:        
         sv.summary_writer.add_summary(results['summary'], global_step)
+        sv.summary_writer.add_summary(validation_summary, global_step)
         train_epoch = math.ceil(global_step / steps_per_epoch)
         train_step = global_step - (train_epoch - 1) * steps_per_epoch
         this_cycle = time.time() - last_summary_time
         last_summary_time += this_cycle
         logging.info(
-            'Epoch: [%2d] [%5d/%5d] time: %4.2fs (%ds total) loss: %.3f',
+            'Epoch: [%2d] [%5d/%5d] time: %4.2fs (%ds total) loss: %.3f, validation_loss: %.3f',
             train_epoch, train_step, steps_per_epoch, this_cycle,
-            time.time() - start_time, results['loss'])
+            time.time() - start_time, results['loss'], results_val['validation_loss'])
+        #print('Validation Summary: {}'.format(validation_summary))
 
       if step % steps_per_epoch == 0:
-        logging.info('[*] Saving checkpoint to %s...', checkpoint_dir)
-        saver.save(sess, os.path.join(checkpoint_dir, 'model'),
-                   global_step=global_step)
+        print('step steps per epoch')
+        if results_val['validation_loss'] < best_val_loss:
+          print('[*] Validation Loss decreased from {} to {}. Saving checkpoint to {}...'.format(best_val_loss, results_val['validation_loss'], checkpoint_dir))
+          best_val_loss = results_val['validation_loss']
+          saver.save(sess, os.path.join(checkpoint_dir, 'model'),
+                        global_step=global_step)
+        else:
+            print('[*] Validation loss did not decrease from {}. Saving checkpoint to {}...'.format(best_val_loss, checkpoint_dir))
+            saver.save(sess, os.path.join(checkpoint_dir, 'last_model'),
+                global_step=global_step)
 
       # Setting step to global_step allows for training for a total of
       # train_steps even if the program is restarted during training.

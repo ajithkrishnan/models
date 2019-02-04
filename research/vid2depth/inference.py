@@ -120,8 +120,10 @@ def _run_inference():
           depth_path = os.path.join(output_dir, '%03d.png' % idx)
         else:
           depth_path = os.path.join(output_dir, '%04d.png' % idx)
+        #print(results['depth'][b])
         depth_map = results['depth'][b]
         depth_map = np.squeeze(depth_map)
+        #print(depth_map)
         colored_map = _normalize_depth_for_display(depth_map, cmap=CMAP)
         input_float = inputs[b].astype(np.float32) / 255.0
         vertical_stack = np.concatenate((input_float, colored_map), axis=0)

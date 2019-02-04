@@ -276,6 +276,7 @@ class Model(object):
   def build_summaries(self):
     """Adds scalar and image summaries for TensorBoard."""
     tf.summary.scalar('total_loss', self.total_loss)
+    self.validation_loss = tf.summary.scalar('validation_loss', self.total_loss)
     tf.summary.scalar('reconstr_loss', self.reconstr_loss)
     if self.smooth_weight > 0:
       tf.summary.scalar('smooth_loss', self.smooth_loss)

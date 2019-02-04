@@ -110,7 +110,8 @@ def get_vars_to_restore(ckpt=None):
 
 def format_number(n):
   """Formats number with thousands commas."""
-  locale.setlocale(locale.LC_ALL, 'en_US')
+  #locale.setlocale(locale.LC_ALL, 'en_US')
+  locale.setlocale(locale.LC_ALL, 'C.UTF-8')
   return locale.format('%d', n, grouping=True)
 
 
