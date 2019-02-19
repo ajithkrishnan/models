@@ -97,8 +97,11 @@ ENV/
 samples/outreach/blogs/segmentation_blogpost/carvana-image-masking-challenge/
 
 #vid2depth
-./git_clones/models/research/vid2depth/checkpoints*
-./git_clones/models/research/vid2depth/data/*
-./git_clones/models/research/vid2depth/inference-validation/*
-./git_clones/models/research/vid2depth/trained_model/*
-./git_clones/models/research/vid2depth/copy/*
+research/vid2depth/copy/*
+research/vid2depth/checkpoints*
+research/vid2depth/data/*
+research/vid2depth/trained_model/*
+research/vid2depth/inference-validation/*
+research/vid2depth/*.pyc
+research/vid2depth/*.swp
+

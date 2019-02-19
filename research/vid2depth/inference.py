@@ -52,6 +52,7 @@ gfile = tf.gfile
 HOME_DIR = os.path.expanduser('~')
 DEFAULT_OUTPUT_DIR = os.path.join(HOME_DIR, 'vid2depth/inference')
 DEFAULT_KITTI_DIR = os.path.join(HOME_DIR, 'kitti-raw-uncompressed')
+DEFAULT_MODE = 'depth'
 
 flags.DEFINE_string('output_dir', DEFAULT_OUTPUT_DIR,
                     'Directory to store estimated depth maps.')
@@ -60,8 +61,11 @@ flags.DEFINE_string('model_ckpt', None, 'Model checkpoint to load.')
 flags.DEFINE_string('kitti_video', None, 'KITTI video directory name.')
 flags.DEFINE_integer('batch_size', 4, 'The size of a sample batch.')
 flags.DEFINE_integer('img_height', 128, 'Image height.')
+#flags.DEFINE_integer('img_width', 416, 'Image width.')
 flags.DEFINE_integer('img_width', 416, 'Image width.')
 flags.DEFINE_integer('seq_length', 3, 'Sequence length for each example.')
+flags.DEFINE_string('mode', DEFAULT_MODE, 'Specify the network to run inference on i.e depth or pose' )
+
 FLAGS = flags.FLAGS
 
 flags.mark_flag_as_required('kitti_video')
@@ -74,9 +78,10 @@ def _run_inference():
   """Runs all images through depth model and saves depth maps."""
   ckpt_basename = os.path.basename(FLAGS.model_ckpt)
   ckpt_modelname = os.path.basename(os.path.dirname(FLAGS.model_ckpt))
-  output_dir = os.path.join(FLAGS.output_dir,
-                            FLAGS.kitti_video.replace('/', '_') + '_' +
-                            ckpt_modelname + '_' + ckpt_basename)
+  #output_dir = os.path.join(FLAGS.output_dir,
+  #                          FLAGS.kitti_video.replace('/', '_') + '_' +
+  #                          ckpt_modelname + '_' + ckpt_basename)
+  output_dir = FLAGS.output_dir
   if not gfile.Exists(output_dir):
     gfile.MakeDirs(output_dir)
   inference_model = model.Model(is_training=False,
@@ -98,36 +103,84 @@ def _run_inference():
       im_files = gfile.Glob(os.path.join(video_path, 'image_02/data', '*.png'))
       im_files = [f for f in im_files if 'disp' not in f]
       im_files = sorted(im_files)
-    for i in range(0, len(im_files), FLAGS.batch_size):
-      if i % 100 == 0:
-        logging.info('Generating from %s: %d/%d', ckpt_basename, i,
-                     len(im_files))
-      inputs = np.zeros(
-          (FLAGS.batch_size, FLAGS.img_height, FLAGS.img_width, 3),
-          dtype=np.uint8)
-      for b in range(FLAGS.batch_size):
-        idx = i + b
-        if idx >= len(im_files):
-          break
-        im = scipy.misc.imread(im_files[idx])
-        inputs[b] = scipy.misc.imresize(im, (FLAGS.img_height, FLAGS.img_width))
-      results = inference_model.inference(inputs, sess, mode='depth')
-      for b in range(FLAGS.batch_size):
-        idx = i + b
-        if idx >= len(im_files):
-          break
-        if FLAGS.kitti_video == 'test_files_eigen':
-          depth_path = os.path.join(output_dir, '%03d.png' % idx)
-        else:
-          depth_path = os.path.join(output_dir, '%04d.png' % idx)
-        #print(results['depth'][b])
-        depth_map = results['depth'][b]
-        depth_map = np.squeeze(depth_map)
-        #print(depth_map)
-        colored_map = _normalize_depth_for_display(depth_map, cmap=CMAP)
-        input_float = inputs[b].astype(np.float32) / 255.0
-        vertical_stack = np.concatenate((input_float, colored_map), axis=0)
-        scipy.misc.imsave(depth_path, vertical_stack)
+
+    egomotion_file = None    
+  
+    with gfile.Open(os.path.join(output_dir, 'inference.txt'), 'w') as inf_egomotion_f:
+
+      for i in range(0, len(im_files), FLAGS.batch_size):
+
+        if i % 100 == 0:
+          logging.info('Generating from %s: %d/%d', ckpt_basename, i,
+                      len(im_files))
+
+        inputs_depth = np.zeros(
+            (FLAGS.batch_size, FLAGS.img_height, FLAGS.img_width, 3),
+            dtype=np.uint8)
+        inputs_egomotion = np.zeros(
+            (FLAGS.batch_size, FLAGS.img_height, FLAGS.img_width *  FLAGS.seq_length, 3),
+            dtype=np.uint8)
+        
+        if FLAGS.mode == 'depth':
+            inputs = inputs_depth
+        elif FLAGS.mode == 'egomotion':
+            inputs = inputs_egomotion
+
+        for b in range(FLAGS.batch_size):
+          idx = i + b
+          if idx >= len(im_files):
+            break
+          im = scipy.misc.imread(im_files[idx])
+
+          if FLAGS.mode == 'depth':
+            inputs[b] = scipy.misc.imresize(im, (FLAGS.img_height, FLAGS.img_width))
+          elif FLAGS.mode == 'egomotion':
+            inputs[b] = scipy.misc.imresize(im, (FLAGS.img_height, 
+                FLAGS.img_width * FLAGS.seq_length))
+        
+        results = inference_model.inference(inputs, sess, mode=FLAGS.mode)
+
+        for b in range(FLAGS.batch_size):
+          idx = i + b
+          if idx >= len(im_files):
+            break
+
+          if FLAGS.mode == 'depth':
+              if FLAGS.kitti_video == 'test_files_eigen':
+                depth_path = os.path.join(output_dir, '%03d.png' % idx)
+              else:
+                depth_path = os.path.join(output_dir, '%04d.png' % idx)
+              depth_map = results['depth'][b]
+              depth_map = np.squeeze(depth_map)
+              colored_map = _normalize_depth_for_display(depth_map, cmap=CMAP)
+              input_float = inputs[b].astype(np.float32) / 255.0
+              vertical_stack = np.concatenate((input_float, colored_map), axis=0)
+              scipy.misc.imsave(depth_path, vertical_stack)
+
+          elif FLAGS.mode == 'egomotion':
+
+              #for j in range(FLAGS.seq_length - 1):
+              if FLAGS.kitti_video == 'test_files_eigen':
+                  #egomotion_path = os.path.join(output_dir, '%03d%03d.txt' % (idx, j))
+                  egomotion_path = os.path.join(output_dir, '%09d.txt' % (idx))
+              else:
+                  egomotion_path = os.path.join(output_dir, '%09d.txt' % (idx))
+
+              print(egomotion_path)
+              egomotion_file = gfile.Open(egomotion_path, 'w')
+              egomotion_data = results['egomotion'][b]
+              #egomotion_data = np.squeeze(egomotion_data)
+
+              
+              #egomotion_file.write(' '.join(str(d) for d in egomotion_data[0]))
+              egomotion_file.write(','.join(str(d) for d in egomotion_data[0]))
+              #egomotion_file.write(' '.join(str(d) for d in egomotion_data))
+
+              inf_egomotion_f.write("%s\n" % (egomotion_path))
+
+              if egomotion_file is not None:
+                  egomotion_file.close()
+     
 
 
 def _gray2rgb(im, cmap=CMAP):
