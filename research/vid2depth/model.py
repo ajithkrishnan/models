@@ -380,3 +380,4 @@ class Model(object):
       inputs_ph = self.inputs_egomotion
     results = sess.run(fetches, feed_dict={inputs_ph: inputs})
     return results
+
