@@ -212,7 +212,7 @@ cc_library(
     textual_hdrs = glob(["features/include/**/*.h*"]),
     deps = BOOST_TARGETS + [
         "@eigen_repo//:eigen",
-        "@hdf5//:hdf5",
+#        "@hdf5//:hdf5",
         ":2d",
         ":common",
         ":kdtree",
@@ -236,7 +236,7 @@ cc_library(
     textual_hdrs = glob(["filters/include/**/*.h*"]),
     deps = BOOST_TARGETS + [
         "@eigen_repo//:eigen",
-        "@hdf5//:hdf5",
+#        "@hdf5//:hdf5",
         ":common",
         ":kdtree",
         ":sample_consensus",

@@ -13,10 +13,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+#include <cstdint>
 #include <stdint.h>
+#include <iostream>
+
+#include <pcl/search/impl/search.hpp>
+#include <pcl/point_types.h>
+//#include <pcl/registration/icp.h>
+#include <pcl/registration/lum.h>
+#include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
 #include <pcl/registration/icp.h>
-#include <pcl/registration/lum.h>
+
 #include "tensorflow/core/framework/common_shape_fns.h"
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/framework/register_types.h"
@@ -48,6 +56,13 @@ class IterativeClosestPointExposed
     return this->correspondences_;
   }
 };
+
+// const std::string & pcl::search::Search::PointXYZ::getName() const{return "asasasas";}
+//template <typename PointT> const std::string&
+//pcl::search::Search<PointT>::getName () const
+//{
+//   return (name_);
+//}
 
 REGISTER_OP("Icp")
     .Attr("T: realnumbertype")
@@ -122,6 +137,7 @@ class IcpOp : public OpKernel {
       P_cloud_size = P_shape.dim_size(1) * P_shape.dim_size(2);
       Q_cloud_size = Q_shape.dim_size(1) * Q_shape.dim_size(2);
     }
+
     auto P_flat = P_tensor.flat<T>();
     auto Q_flat = Q_tensor.flat<T>();
     #define PIDX(b, i, j) b * P_cloud_size + i * 3 + j
@@ -139,13 +155,14 @@ class IcpOp : public OpKernel {
     auto output_transform = transform_tensor->template flat<T>();
     auto output_residual = residual_tensor->template flat<T>();
 
-    auto worker_threads = *(context->device()->tensorflow_cpu_worker_threads());
+    // auto worker_threads = *(context->device()->tensorflow_cpu_worker_threads());
 
-    auto do_work = [context, &P_shape, &Q_shape, is_organized, &P_flat, &Q_flat,
-                    &output_transform, &output_residual, P_cloud_size,
-                    Q_cloud_size, &ego_motion_flat,
-                    this](int64_t start_row, int64_t limit_row) {
-      for (size_t b = start_row; b < limit_row; ++b) {
+    // auto do_work = [context, &P_shape, &Q_shape, is_organized, &P_flat, &Q_flat,
+    //                 &output_transform, &output_residual, P_cloud_size,
+    //                 Q_cloud_size, &ego_motion_flat,
+    //                 this](int64_t start_row, int64_t limit_row) {
+    //     std::cout << "--------------AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA4---------------" << std::endl;
+      for (size_t b = 0; b < batch_size; ++b) {
         PointCloud<PointXYZ>::Ptr cloud_in(new PointCloud<PointXYZ>);
         PointCloud<PointXYZ>::Ptr cloud_target(new PointCloud<PointXYZ>);
 
@@ -179,6 +196,7 @@ class IcpOp : public OpKernel {
           cloud_target->points[i].y = Q_flat(QIDX(b, i, 1));
           cloud_target->points[i].z = Q_flat(QIDX(b, i, 2));
         }
+
         // Apply ego-motion.
         Eigen::Vector6f ego_motion_vector;
         int s = b * kTransformSize;
@@ -199,6 +217,7 @@ class IcpOp : public OpKernel {
         if (kMaxCorrespondenceDistance > 0) {
           icp.setMaxCorrespondenceDistance(kMaxCorrespondenceDistance);
         }
+
         icp.setInputSource(cloud_in_moved);
         icp.setInputTarget(cloud_target);
         PointCloud<PointXYZ> Final;
@@ -239,12 +258,14 @@ class IcpOp : public OpKernel {
         output_transform(b * kTransformSize + 4) = rotation(1);      // ry.
         output_transform(b * kTransformSize + 5) = rotation(2);      // rz.
       }
-    };  // End of closure.
+    // };  // End of closure.
 
-    // Incredibly rough estimate of clock cycles for do_work
-    const int64_t cost = 50 * P_cloud_size * P_cloud_size;
-    Shard(worker_threads.num_threads, worker_threads.workers, batch_size, cost,
-          do_work);
+    // // Incredibly rough estimate of clock cycles for do_work
+    // const int64_t cost = 50 * P_cloud_size * P_cloud_size;
+    // worker_threads.num_threads = 0;
+    // std::cout << worker_threads.num_threads << std::endl;
+    // std::cout << worker_threads.workers << std::endl;
+    // Shard(worker_threads.num_threads, worker_threads.workers, batch_size, cost, do_work);
   }
 
   Eigen::Vector3f DecomposeRotationScale(const Eigen::Matrix4f& mat) {
@@ -301,4 +322,3 @@ REGISTER_KERNEL_BUILDER(Name("Icp")
                             .Device(DEVICE_CPU)
                             .TypeConstraint<double>("T"),
                         IcpOp<double>);
-

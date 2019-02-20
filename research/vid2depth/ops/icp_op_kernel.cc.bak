@@ -144,7 +144,7 @@ class IcpOp : public OpKernel {
     auto do_work = [context, &P_shape, &Q_shape, is_organized, &P_flat, &Q_flat,
                     &output_transform, &output_residual, P_cloud_size,
                     Q_cloud_size, &ego_motion_flat,
-                    this](int64_t start_row, int64_t limit_row) {
+                    this](int64 start_row, int64 limit_row) {
       for (size_t b = start_row; b < limit_row; ++b) {
         PointCloud<PointXYZ>::Ptr cloud_in(new PointCloud<PointXYZ>);
         PointCloud<PointXYZ>::Ptr cloud_target(new PointCloud<PointXYZ>);
@@ -242,7 +242,7 @@ class IcpOp : public OpKernel {
     };  // End of closure.
 
     // Incredibly rough estimate of clock cycles for do_work
-    const int64_t cost = 50 * P_cloud_size * P_cloud_size;
+    const int64 cost = 50 * P_cloud_size * P_cloud_size;
     Shard(worker_threads.num_threads, worker_threads.workers, batch_size, cost,
           do_work);
   }

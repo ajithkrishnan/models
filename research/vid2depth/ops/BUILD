@@ -10,14 +10,19 @@ filegroup(
 cc_library(
     name = "icp_op_kernel",
     srcs = ["icp_op_kernel.cc"],
+#    srcs = ["icp_op_kernel.cc eigen_3_3_4/*"],
     copts = [
         "-fexceptions",
         "-Wno-sign-compare",
         "-D_GLIBCXX_USE_CXX11_ABI=0",
+        "-I/usr/include/pcl-1.7", 
+        "-I/usr/include/eigen_3_3_4", 
+        "-Iops/eigen_3_3_4", 
     ],
+    linkopts = [" -lpcl_common -lpcl_features -lpcl_filters -lpcl_io -lpcl_io_ply -lpcl_kdtree -lpcl_keypoints -lpcl_octree -lpcl_outofcore -lpcl_people -lpcl_recognition -lpcl_registration -lpcl_sample_consensus -lpcl_search -lpcl_segmentation -lpcl_surface -lpcl_tracking -lpcl_visualization -lflann -L/usr/lib/x86_64-linux-gnu" ],
     deps = [
-        "@com_github_pointcloudlibrary_pcl//:common",
-        "@com_github_pointcloudlibrary_pcl//:registration",
+    #    "@com_github_pointcloudlibrary_pcl//:common",
+    #    "@com_github_pointcloudlibrary_pcl//:registration",
         "@com_google_protobuf//:protobuf",
         "@org_tensorflow//tensorflow/core:framework_headers_lib",
     ],
@@ -68,9 +73,14 @@ py_library(
 cc_binary(
     name = "pcl_demo",
     srcs = ["pcl_demo.cc"],
+    copts = [
+        "-I/usr/include/pcl-1.7", 
+        "-I/usr/include/eigen3", 
+    ],
+    linkopts = [" -lpcl_common -lpcl_features -lpcl_filters -lpcl_io -lpcl_io_ply -lpcl_kdtree -lpcl_keypoints -lpcl_octree -lpcl_outofcore -lpcl_people -lpcl_recognition -lpcl_registration -lpcl_sample_consensus -lpcl_search -lpcl_segmentation -lpcl_surface -lpcl_tracking -lpcl_visualization -lflann -L/usr/lib/x86_64-linux-gnu" ],
     deps = [
-        "@com_github_pointcloudlibrary_pcl//:common",
-        "@com_github_pointcloudlibrary_pcl//:registration",
+#        "@com_github_pointcloudlibrary_pcl//:common",
+#        "@com_github_pointcloudlibrary_pcl//:registration",
     ],
 )
 

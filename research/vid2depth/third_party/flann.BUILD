@@ -140,7 +140,7 @@ BOOST_TARGETS = [
 ]
 
 FLANN_DEPS = BOOST_TARGETS + [
-    "@hdf5//:hdf5",
+#    "@hdf5//:hdf5",
 ]
 
 cc_library(
