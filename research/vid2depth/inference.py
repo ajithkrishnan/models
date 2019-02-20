@@ -137,6 +137,7 @@ def _run_inference():
           elif FLAGS.mode == 'egomotion':
             inputs[b] = scipy.misc.imresize(im, (FLAGS.img_height, 
                 FLAGS.img_width * FLAGS.seq_length))
+            #inputs[b] = scipy.misc.imresize(im, (FLAGS.img_height, FLAGS.img_width))
         
         results = inference_model.inference(inputs, sess, mode=FLAGS.mode)
 
@@ -159,27 +160,34 @@ def _run_inference():
 
           elif FLAGS.mode == 'egomotion':
 
-              #for j in range(FLAGS.seq_length - 1):
-              if FLAGS.kitti_video == 'test_files_eigen':
-                  #egomotion_path = os.path.join(output_dir, '%03d%03d.txt' % (idx, j))
-                  egomotion_path = os.path.join(output_dir, '%09d.txt' % (idx))
-              else:
-                  egomotion_path = os.path.join(output_dir, '%09d.txt' % (idx))
+              for j in range(FLAGS.seq_length - 1):
 
-              print(egomotion_path)
-              egomotion_file = gfile.Open(egomotion_path, 'w')
-              egomotion_data = results['egomotion'][b]
-              #egomotion_data = np.squeeze(egomotion_data)
+                  if FLAGS.kitti_video == 'test_files_eigen':
+    #                  print("idx = {}".format(idx))
+    #                  print("j = {}".format(j))
+                      egomotion_path = os.path.join(output_dir, '%i%d.txt' % (idx,j))
+                  else:
+#                      egomotion_path = os.path.join(output_dir, '%i%d.txt' % (idx,j))
+                      egomotion_path = os.path.join(output_dir, '%04d.txt' % (idx+j))
+        #              egomotion_path = os.path.join(output_dir, '%09d.txt' % (idx))
 
-              
-              #egomotion_file.write(' '.join(str(d) for d in egomotion_data[0]))
-              egomotion_file.write(','.join(str(d) for d in egomotion_data[0]))
-              #egomotion_file.write(' '.join(str(d) for d in egomotion_data))
+    #              DEBUG
+    #              print(egomotion_path)
 
-              inf_egomotion_f.write("%s\n" % (egomotion_path))
+                  egomotion_file = gfile.Open(egomotion_path, 'w')
+                  egomotion_data = results['egomotion'][b]
+                  egomotion_data = np.squeeze(egomotion_data)
 
-              if egomotion_file is not None:
-                  egomotion_file.close()
+    #              print("shape of egomotion_data : {}".format(np.shape(egomotion_data)))
+
+                  
+                  egomotion_file.write(' '.join(str(d) for d in egomotion_data[j]))
+    #              egomotion_file.write(' '.join(str(d) for d in egomotion_data[0]))
+
+                  inf_egomotion_f.write("%s\n" % (egomotion_path))
+
+                  if egomotion_file is not None:
+                      egomotion_file.close()
      
 
 

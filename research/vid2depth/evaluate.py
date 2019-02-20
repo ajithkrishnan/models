@@ -30,17 +30,18 @@ if __name__ == '__main__':
             with open(os.path.join(args.prediction_path, 'inference.txt')) as inf_file:
                                 
                     inf_reader = csv.reader(inf_file, delimiter=' ')
-
                          
+                    row_count = 0 
                     for inf_row, gt_file in zip(inf_reader, sorted(os.listdir(args.gt_path))):
 
+#                        print("inf_row index : {}".format(row_count))
                         with open(inf_row[0]) as inf_pose_file, open(os.path.join(args.gt_path, gt_file)) as gt_pose_file:
                             #DEBUG: print file name 
 #                            print("gt_pose_file : {}".format(gt_file))
-                            print("inf_pose_file : {}".format(inf_row[0]))
+#                            print("inf_pose_file : {}".format(inf_row[0]))
 
 
-                            inf_pose_reader = csv.reader(inf_pose_file, delimiter=',')
+                            inf_pose_reader = csv.reader(inf_pose_file, delimiter=' ')
                             gt_pose_reader = csv.reader(gt_pose_file, delimiter=' ')                            
 
                             #    DEBUG: To print the no. of rows in the file
@@ -48,8 +49,22 @@ if __name__ == '__main__':
 
                             for inf_pose, gt_pose in zip(inf_pose_reader, gt_pose_reader):
                                 for i in range(0, len(inf_pose)-1):
-                                    print("inf_pose[{}]: {}".format(i,inf_pose[i]))
+#                                    print("inf type: {}".format(type(inf_pose[0])))
+#                                    print("gt type: {}".format(type(gt_pose[0])))
+                                    if row_count == 0:
+                                        lat_ref = float(gt_pose[0])
+                                        long_ref = float(gt_pose[1])
+                                    else:
+                                        lat_prediction = lat_ref + float(inf_pose[0])
+                                        long_prediction = long_ref + float(inf_pose[1])
+                                        print("reference lat: {}, long: {}".format(lat_ref,long_ref)) 
+                                        print("predicted lat: {}, long: {}".format(lat_prediction,long_prediction)) 
+                                        lat_ref = float(gt_pose[0])
+                                        long_ref = float(gt_pose[1])
+#                                    print("inf_pose[{}]: {}".format(i,inf_pose[i]))
 #                                    print("gt_pose[{}] : {}".format(i,gt_pose[i]))
+
+                        row_count += 1
 
 
 
