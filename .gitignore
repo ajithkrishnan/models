@@ -102,6 +102,20 @@ research/vid2depth/checkpoints*
 research/vid2depth/data/*
 research/vid2depth/trained_model/*
 research/vid2depth/inference-validation/*
+research/vid2depth/inference_*/
+research/vid2depth/bazel*
+research/vid2depth/core
+research/vid2depth/ops/eigen*
 research/vid2depth/*.pyc
+research/vid2depth/**/*.pyc
 research/vid2depth/*.swp
+research/vid2depth/**/*.swp
+research/vid2depth/*.txt
+research/vid2depth/**/*.txt
+research/vid2depth/*.zip
+research/vid2depth/**/*.zip
+research/vid2depth/*.gz
+research/vid2depth/**/*.gz
+research/vid2depth/*.tar
+research/vid2depth/**/*.tar
 
