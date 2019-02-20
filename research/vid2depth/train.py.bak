@@ -44,8 +44,6 @@ import numpy as np
 import tensorflow as tf
 import util
 
-from tensorflow.python import debug as tf_debug
-
 gfile = tf.gfile
 
 HOME_DIR = os.path.expanduser('~')
@@ -137,13 +135,8 @@ def train(train_model, pretrained_ckpt, checkpoint_dir, train_steps,
   sv = tf.train.Supervisor(logdir=checkpoint_dir, save_summaries_secs=0,
                            saver=None)
   config = tf.ConfigProto()
-  # DEBUG : error CUDA_OUT_OF_MEMORY
-  #config.gpu_options.per_process_gpu_memory_fraction = 0.90
-  #config.gpu_options.allocator_type = 'BFC'
   config.gpu_options.allow_growth = True
   with sv.managed_session(config=config) as sess:
-
-#    sess = tf_debug.TensorBoardDebugWrapperSession(sess, "sts-dgx1:9999")
     if pretrained_ckpt is not None:
       logging.info('Restoring pretrained weights from %s', pretrained_ckpt)
       pretrain_restorer.restore(sess, pretrained_ckpt)
