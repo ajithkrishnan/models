@@ -61,7 +61,6 @@ flags.DEFINE_string('model_ckpt', None, 'Model checkpoint to load.')
 flags.DEFINE_string('kitti_video', None, 'KITTI video directory name.')
 flags.DEFINE_integer('batch_size', 4, 'The size of a sample batch.')
 flags.DEFINE_integer('img_height', 128, 'Image height.')
-#flags.DEFINE_integer('img_width', 416, 'Image width.')
 flags.DEFINE_integer('img_width', 416, 'Image width.')
 flags.DEFINE_integer('seq_length', 3, 'Sequence length for each example.')
 flags.DEFINE_string('mode', DEFAULT_MODE, 'Specify the network to run inference on i.e depth or pose' )
@@ -78,9 +77,9 @@ def _run_inference():
   """Runs all images through depth model and saves depth maps."""
   ckpt_basename = os.path.basename(FLAGS.model_ckpt)
   ckpt_modelname = os.path.basename(os.path.dirname(FLAGS.model_ckpt))
-  #output_dir = os.path.join(FLAGS.output_dir,
-  #                          FLAGS.kitti_video.replace('/', '_') + '_' +
-  #                          ckpt_modelname + '_' + ckpt_basename)
+#  output_dir = os.path.join(FLAGS.output_dir,
+#                            FLAGS.kitti_video.replace('/', '_') + '_' +
+#                            ckpt_modelname + '_' + ckpt_basename)
   output_dir = FLAGS.output_dir
   if not gfile.Exists(output_dir):
     gfile.MakeDirs(output_dir)
@@ -137,7 +136,6 @@ def _run_inference():
           elif FLAGS.mode == 'egomotion':
             inputs[b] = scipy.misc.imresize(im, (FLAGS.img_height, 
                 FLAGS.img_width * FLAGS.seq_length))
-            #inputs[b] = scipy.misc.imresize(im, (FLAGS.img_height, FLAGS.img_width))
         
         results = inference_model.inference(inputs, sess, mode=FLAGS.mode)
 
@@ -163,27 +161,14 @@ def _run_inference():
               for j in range(FLAGS.seq_length - 1):
 
                   if FLAGS.kitti_video == 'test_files_eigen':
-    #                  print("idx = {}".format(idx))
-    #                  print("j = {}".format(j))
                       egomotion_path = os.path.join(output_dir, '%i%d.txt' % (idx,j))
                   else:
-#                      egomotion_path = os.path.join(output_dir, '%i%d.txt' % (idx,j))
                       egomotion_path = os.path.join(output_dir, '%04d.txt' % (idx+j))
-        #              egomotion_path = os.path.join(output_dir, '%09d.txt' % (idx))
-
-    #              DEBUG
-    #              print(egomotion_path)
 
                   egomotion_file = gfile.Open(egomotion_path, 'w')
                   egomotion_data = results['egomotion'][b]
                   egomotion_data = np.squeeze(egomotion_data)
-
-    #              print("shape of egomotion_data : {}".format(np.shape(egomotion_data)))
-
-                  
                   egomotion_file.write(' '.join(str(d) for d in egomotion_data[j]))
-    #              egomotion_file.write(' '.join(str(d) for d in egomotion_data[0]))
-
                   inf_egomotion_f.write("%s\n" % (egomotion_path))
 
                   if egomotion_file is not None:
