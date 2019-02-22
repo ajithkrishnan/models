@@ -99,16 +99,15 @@ def _run_inference():
       im_files = [os.path.join(FLAGS.kitti_dir, f) for f in im_files]
     else:
       video_path = os.path.join(FLAGS.kitti_dir, FLAGS.kitti_video)
-      im_files = gfile.Glob(os.path.join(video_path, 'image_02/data', '*.png'))
+#      im_files = gfile.Glob(os.path.join(video_path, 'image_02/data', '*.png'))
+      im_files = gfile.Glob(os.path.join(video_path, 'image_2/', '*.png'))
       im_files = [f for f in im_files if 'disp' not in f]
       im_files = sorted(im_files)
 
     egomotion_file = None    
   
     with gfile.Open(os.path.join(output_dir, 'inference.txt'), 'w') as inf_egomotion_f:
-
       for i in range(0, len(im_files), FLAGS.batch_size):
-
         if i % 100 == 0:
           logging.info('Generating from %s: %d/%d', ckpt_basename, i,
                       len(im_files))
@@ -157,9 +156,7 @@ def _run_inference():
               scipy.misc.imsave(depth_path, vertical_stack)
 
           elif FLAGS.mode == 'egomotion':
-
               for j in range(FLAGS.seq_length - 1):
-
                   if FLAGS.kitti_video == 'test_files_eigen':
                       egomotion_path = os.path.join(output_dir, '%i%d.txt' % (idx,j))
                   else:
