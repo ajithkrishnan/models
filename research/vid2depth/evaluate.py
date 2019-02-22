@@ -19,57 +19,58 @@ args = parser.parse_args()
 gfile = tf.gfile
 
 if __name__ == '__main__':
-    
 
     if args.split == 'kitti':
-        num_samples = 200
+        NUM_SAMPLES = 447
         
-
         if os.path.exists(args.prediction_path) and os.path.exists(args.gt_path):
-
-            with open(os.path.join(args.prediction_path, 'inference.txt')) as inf_file:
+            with open(os.path.join(args.prediction_path, 'inference.txt')) as pred_file:
                                 
-                    inf_reader = csv.reader(inf_file, delimiter=' ')
-                         
+                    pred_reader = csv.reader(pred_file, delimiter=' ')
                     row_count = 0 
-                    for inf_row, gt_file in zip(inf_reader, sorted(os.listdir(args.gt_path))):
+                    gt_prev_pose = []
+                    ate_all = []
 
-#                        print("inf_row index : {}".format(row_count))
-                        with open(inf_row[0]) as inf_pose_file, open(os.path.join(args.gt_path, gt_file)) as gt_pose_file:
-                            #DEBUG: print file name 
-#                            print("gt_pose_file : {}".format(gt_file))
-#                            print("inf_pose_file : {}".format(inf_row[0]))
+                    for pred_row, gt_file in zip(pred_reader, sorted(os.listdir(args.gt_path))):
+                        with open(pred_row[0]) as pred_pose_file, open(os.path.join(args.gt_path, gt_file)) as gt_pose_file:
 
-
-                            inf_pose_reader = csv.reader(inf_pose_file, delimiter=' ')
+                            pred_pose_reader = csv.reader(pred_pose_file, delimiter=' ')
                             gt_pose_reader = csv.reader(gt_pose_file, delimiter=' ')                            
-
                             #    DEBUG: To print the no. of rows in the file
                             #    a = sum(1 for line in gt_pose_file)
 
-                            for inf_pose, gt_pose in zip(inf_pose_reader, gt_pose_reader):
-                                for i in range(0, len(inf_pose)-1):
-#                                    print("inf type: {}".format(type(inf_pose[0])))
-#                                    print("gt type: {}".format(type(gt_pose[0])))
-                                    if row_count == 0:
-                                        lat_ref = float(gt_pose[0])
-                                        long_ref = float(gt_pose[1])
-                                    else:
-                                        lat_prediction = lat_ref + float(inf_pose[0])
-                                        long_prediction = long_ref + float(inf_pose[1])
-                                        print("reference lat: {}, long: {}".format(lat_ref,long_ref)) 
-                                        print("predicted lat: {}, long: {}".format(lat_prediction,long_prediction)) 
-                                        lat_ref = float(gt_pose[0])
-                                        long_ref = float(gt_pose[1])
-#                                    print("inf_pose[{}]: {}".format(i,inf_pose[i]))
-#                                    print("gt_pose[{}] : {}".format(i,gt_pose[i]))
+                            for delta_pose, gt_pose in zip(pred_pose_reader, gt_pose_reader):
+                                gt_curr_pose = np.array([float(value) for value in gt_pose[0:6]])
+                                delta_pose = np.array([float(value) for value in delta_pose])
+#                                gt_curr_pose = [float(value) for value in gt_pose[0:6]]
+#                                delta_pose = [float(value) for value in delta_pose]
 
-                        row_count += 1
+                                if row_count == 0:
+                                    gt_prev_pose = gt_curr_pose
+                                else:
+#                                    pred_pose = gt_prev_pose + delta_pose
+                                    pred_pose = np.add(gt_prev_pose, delta_pose)
+                                    scale = np.sum(gt_curr_pose * pred_pose)/np.sum(pred_pose ** 2)
+                                    alignment_error = pred_pose * scale - gt_curr_pose 
+#                                    rmse = np.sqrt(np.sum(alignment_error ** 2)))/len()
+                                    rmse = np.sqrt(np.sum(alignment_error ** 2))/ NUM_SAMPLES
+                                    ate_all.append(rmse)
+                                    gt_prev_pose = gt_curr_pose
+
+#                                    print("ROW Count {}".format(row_count))
+#                                    print("gt_curr_pose : {}".format(gt_curr_pose[0]))
+#                                    print("pred_pose lat: {}".format(pred_pose[0]))
+
+#
+                            row_count += 1
+
+                    ate_all = np.array(ate_all)
+                    print("ATE mean: {}, std: {}".format(np.mean(ate_all), np.std(ate_all)))
+
+    
 
 
-
-
-                #pose_data = inf_egomotion_f.readlines()
+                #pose_data = pred_egomotion_f.readlines()
                 #print(pose_data)
 
 
