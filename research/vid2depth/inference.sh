@@ -5,7 +5,7 @@
 
 python $PATH_VID2DEPTH/inference.py \
       --kitti_dir $PATH_KITTI_ODOM/ \
-      --output_dir $PATH_VID2DEPTH/inference_validation_egomotion \
+      --output_dir $PATH_VID2DEPTH/inference_validation_egomotion/ \
       --kitti_video 09  \
       --model_ckpt $PATH_VID2DEPTH/trained_model/model-119496 \
       --mode egomotion 

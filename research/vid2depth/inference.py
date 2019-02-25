@@ -46,6 +46,7 @@ import numpy as np
 import scipy.misc
 import tensorflow as tf
 import util
+from kitti_eval.pose_evaluation_utils import dump_pose_seq_TUM
 
 gfile = tf.gfile
 
@@ -91,6 +92,12 @@ def _run_inference():
   vars_to_restore = util.get_vars_to_restore(FLAGS.model_ckpt)
   saver = tf.train.Saver(vars_to_restore)
   sv = tf.train.Supervisor(logdir='/tmp/', saver=None)
+
+  max_src_offset = (FLAGS.seq_length - 1)//2
+  with open(FLAGS.kitti_dir + 'sequences/%.2d/times.txt' % int(FLAGS.kitti_video), 'r') as f:
+      times = f.readlines()
+  times = np.array([float(s[:-1]) for s in times])
+
   with sv.managed_session() as sess:
     saver.restore(sess, FLAGS.model_ckpt)
     if FLAGS.kitti_video == 'test_files_eigen':
@@ -98,7 +105,7 @@ def _run_inference():
           util.get_resource_path('dataset/kitti/test_files_eigen.txt'))
       im_files = [os.path.join(FLAGS.kitti_dir, f) for f in im_files]
     else:
-      video_path = os.path.join(FLAGS.kitti_dir, FLAGS.kitti_video)
+      video_path = os.path.join(FLAGS.kitti_dir, 'sequences/', FLAGS.kitti_video)
 #      im_files = gfile.Glob(os.path.join(video_path, 'image_02/data', '*.png'))
       im_files = gfile.Glob(os.path.join(video_path, 'image_2/', '*.png'))
       im_files = [f for f in im_files if 'disp' not in f]
@@ -157,19 +164,35 @@ def _run_inference():
 
           elif FLAGS.mode == 'egomotion':
               for j in range(FLAGS.seq_length - 1):
-                  if FLAGS.kitti_video == 'test_files_eigen':
-                      egomotion_path = os.path.join(output_dir, '%i%d.txt' % (idx,j))
-                  else:
-                      egomotion_path = os.path.join(output_dir, '%04d.txt' % (idx+j))
+#                  if FLAGS.kitti_video == 'test_files_eigen':
+#                      egomotion_path = os.path.join(output_dir, '%i%d.txt' % (idx,j))
+#                  else:
+#                      egomotion_path = os.path.join(output_dir, '%04d.txt' % (idx+j))
+#
+#                  egomotion_file = gfile.Open(egomotion_path, 'w')
+#                  egomotion_data = results['egomotion'][b]
+#                  egomotion_data = np.squeeze(egomotion_data)
+#                  egomotion_file.write(' '.join(str(d) for d in egomotion_data[j]))
 
-                  egomotion_file = gfile.Open(egomotion_path, 'w')
-                  egomotion_data = results['egomotion'][b]
-                  egomotion_data = np.squeeze(egomotion_data)
-                  egomotion_file.write(' '.join(str(d) for d in egomotion_data[j]))
+                  # DEBUG just an index or does it refer to the target frame
+                  tgt_idx = idx + j
+                  egomotion_data = results['egomotion'][0]
+                  # Insert target pose
+                  # DEBUG: check if the target pose is at the right index
+#                  egomotion_data = np.insert(egomotion_data, max_src_offset, np.zeros((1,6)), axis=0) 
+                  egomotion_data = np.insert(egomotion_data, 1, np.zeros((1,6)), axis=0) 
+#                  curr_times = times[tgt_idx - max_src_offset:tgt_idx + max_src_offset + 1]
+                  curr_times = times[tgt_idx - 1:tgt_idx + 1 + 1]
+                  #egomotion_file = output_dir + '%.6d.txt' % (tgt_idx - max_src_offset)
+                  egomotion_file = output_dir + '%.6d.txt' % (tgt_idx - 1)
+                  egomotion_path = os.path.join(FLAGS.output_dir, str(egomotion_file))
+                  print(egomotion_path)
+                  dump_pose_seq_TUM(egomotion_path, egomotion_data, curr_times)
                   inf_egomotion_f.write("%s\n" % (egomotion_path))
 
-                  if egomotion_file is not None:
-                      egomotion_file.close()
+                  # DEBUG : confirm if this is needed
+#                  if egomotion_file is not None:
+#                      egomotion_file.close()
      
 
 
