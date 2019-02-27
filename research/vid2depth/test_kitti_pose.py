@@ -148,11 +148,10 @@ def _run_inference():
         egomotion_data = np.insert(egomotion_data, 0, np.zeros((1,6)), axis=0) 
         egomotion_data = np.insert(egomotion_data, 2, np.zeros((1,6)), axis=0) 
         curr_times = times[tgt_idx - max_offset:tgt_idx + max_offset + 1]
-        #egomotion_file = FLAGS.output_dir + '%.6d.txt' % (tgt_idx - max_src_offset)
-        egomotion_file = FLAGS.output_dir + '%.6d.txt' % (tgt_idx - 1)
-        egomotion_path = os.path.join(FLAGS.output_dir, str(egomotion_file))
-        dump_pose_seq_TUM(egomotion_path, egomotion_data, curr_times)
-        inf_egomotion_f.write("%s\n" % (egomotion_path))
+        egomotion_file = FLAGS.output_dir + '%.6d.txt' % (tgt_idx - max_offset)
+#        egomotion_path = os.path.join(FLAGS.output_dir, str(egomotion_file))
+        dump_pose_seq_TUM(egomotion_file, egomotion_data, curr_times)
+#        inf_egomotion_f.write("%s\n" % (egomotion_path))
         #DEBUG
         if tgt_idx % 100 == 0:
             print("shape of image_seq: {}".format(image_seq.shape))
@@ -164,32 +163,6 @@ def _run_inference():
           # DEBUG : confirm if this is needed
 #                  if egomotion_file is not None:
 #                      egomotion_file.close()
-
-
-def _gray2rgb(im, cmap=CMAP):
-  cmap = plt.get_cmap(cmap)
-  rgba_img = cmap(im.astype(np.float32))
-  rgb_img = np.delete(rgba_img, 3, 2)
-  return rgb_img
-
-
-def _normalize_depth_for_display(depth,
-                                 pc=95,
-                                 crop_percent=0,
-                                 normalizer=None,
-                                 cmap=CMAP):
-  """Converts a depth map to an RGB image."""
-  # Convert to disparity.
-  disp = 1.0 / (depth + 1e-6)
-  if normalizer is not None:
-    disp /= normalizer
-  else:
-    disp /= (np.percentile(disp, pc) + 1e-6)
-  disp = np.clip(disp, 0, 1)
-  disp = _gray2rgb(disp, cmap=cmap)
-  keep_h = int(disp.shape[0] * (1 - crop_percent))
-  disp = disp[:keep_h]
-  return disp
 
 
 def load_image_sequence(dataset_dir, 
