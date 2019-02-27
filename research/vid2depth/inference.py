@@ -93,10 +93,6 @@ def _run_inference():
   saver = tf.train.Saver(vars_to_restore)
   sv = tf.train.Supervisor(logdir='/tmp/', saver=None)
 
-  max_src_offset = (FLAGS.seq_length - 1)//2
-  with open(FLAGS.kitti_dir + 'sequences/%.2d/times.txt' % int(FLAGS.kitti_video), 'r') as f:
-      times = f.readlines()
-  times = np.array([float(s[:-1]) for s in times])
 
   with sv.managed_session() as sess:
     saver.restore(sess, FLAGS.model_ckpt)
@@ -112,9 +108,20 @@ def _run_inference():
       im_files = sorted(im_files)
 
     egomotion_file = None    
+
+#    max_offset = (FLAGS.seq_length - 1)//2
+    max_offset = 1
+    if FLAGS.mode == 'egomotion':
+        test_frames = ['%.2d %.6d' % (FLAGS.kitti_video, n) for n in range(im_files)]
+        with open(FLAGS.kitti_dir + 'sequences/%.2d/times.txt' % int(FLAGS.kitti_video), 'r') as f:
+            times = f.readlines()
+        times = np.array([float(s[:-1]) for s in times])
   
     with gfile.Open(os.path.join(output_dir, 'inference.txt'), 'w') as inf_egomotion_f:
       for i in range(0, len(im_files), FLAGS.batch_size):
+
+        if not is_valid_sample(test_frames, i, FLAGS.seq_length):
+          continue
         if i % 100 == 0:
           logging.info('Generating from %s: %d/%d', ckpt_basename, i,
                       len(im_files))
@@ -131,21 +138,24 @@ def _run_inference():
         elif FLAGS.mode == 'egomotion':
             inputs = inputs_egomotion
 
-        for b in range(FLAGS.batch_size):
+#        for b in range(FLAGS.batch_size):
+        for b in range(FLAGS.seq_length):
           idx = i + b
           if idx >= len(im_files):
             break
-          im = scipy.misc.imread(im_files[idx])
 
           if FLAGS.mode == 'depth':
+            im = scipy.misc.imread(im_files[idx])
             inputs[b] = scipy.misc.imresize(im, (FLAGS.img_height, FLAGS.img_width))
           elif FLAGS.mode == 'egomotion':
+            im = np.concatenate(scipy.misc.imread(im_files[j] for j in (idx-max_offset, idx, idx+max_offset), axis=1)
             inputs[b] = scipy.misc.imresize(im, (FLAGS.img_height, 
                 FLAGS.img_width * FLAGS.seq_length))
         
         results = inference_model.inference(inputs, sess, mode=FLAGS.mode)
 
-        for b in range(FLAGS.batch_size):
+#        for b in range(FLAGS.batch_size):
+        for b in range(FLAGS.seq_length):
           idx = i + b
           if idx >= len(im_files):
             break
@@ -163,7 +173,7 @@ def _run_inference():
               scipy.misc.imsave(depth_path, vertical_stack)
 
           elif FLAGS.mode == 'egomotion':
-              for j in range(FLAGS.seq_length - 1):
+#              for j in range(FLAGS.seq_length - 1):
 #                  if FLAGS.kitti_video == 'test_files_eigen':
 #                      egomotion_path = os.path.join(output_dir, '%i%d.txt' % (idx,j))
 #                  else:
@@ -175,22 +185,23 @@ def _run_inference():
 #                  egomotion_file.write(' '.join(str(d) for d in egomotion_data[j]))
 
                   # DEBUG just an index or does it refer to the target frame
-                  tgt_idx = idx + j
-                  egomotion_data = results['egomotion'][0]
-                  # Insert target pose
-                  # DEBUG: check if the target pose is at the right index
-#                  egomotion_data = np.insert(egomotion_data, max_src_offset, np.zeros((1,6)), axis=0) 
-                  egomotion_data = np.insert(egomotion_data, 1, np.zeros((1,6)), axis=0) 
-#                  curr_times = times[tgt_idx - max_src_offset:tgt_idx + max_src_offset + 1]
-                  curr_times = times[tgt_idx - 1:tgt_idx + 1 + 1]
-                  #egomotion_file = output_dir + '%.6d.txt' % (tgt_idx - max_src_offset)
-                  egomotion_file = output_dir + '%.6d.txt' % (tgt_idx - 1)
-                  egomotion_path = os.path.join(FLAGS.output_dir, str(egomotion_file))
-                  print(egomotion_path)
-                  dump_pose_seq_TUM(egomotion_path, egomotion_data, curr_times)
-                  inf_egomotion_f.write("%s\n" % (egomotion_path))
+#              tgt_idx = idx + j
+              egomotion_data = results['egomotion'][0]
+              print("shape of results['egomotion']: {}".format(results['egomotion'].shape))
+              print("shape of results['egomotion'][0]: {}".format(results['egomotion'][0].shape))
+              # Insert target poses
+              # DEBUG: check if the target pose is at the right index
+              egomotion_data = np.insert(egomotion_data, 0, np.zeros((1,6)), axis=0) 
+              egomotion_data = np.insert(egomotion_data, 2, np.zeros((1,6)), axis=0) 
+              curr_times = times[tgt_idx - max_offset:tgt_idx + max_offset + 1]
+              #egomotion_file = output_dir + '%.6d.txt' % (tgt_idx - max_src_offset)
+              egomotion_file = output_dir + '%.6d.txt' % (tgt_idx - 1)
+              egomotion_path = os.path.join(FLAGS.output_dir, str(egomotion_file))
+              print(egomotion_path)
+              dump_pose_seq_TUM(egomotion_path, egomotion_data, curr_times)
+              inf_egomotion_f.write("%s\n" % (egomotion_path))
 
-                  # DEBUG : confirm if this is needed
+              # DEBUG : confirm if this is needed
 #                  if egomotion_file is not None:
 #                      egomotion_file.close()
      
@@ -221,6 +232,22 @@ def _normalize_depth_for_display(depth,
   disp = disp[:keep_h]
   return disp
 
+
+def is_valid_sample(frames, tgt_idx, seq_length):
+    N = len(frames)
+    tgt_drive, _ = frames[tgt_idx].split(' ')
+    #TODO: calculate max_offset in a clean way 
+#    max_offset = (seq_length - 1)//2
+    max_offset = 1
+    max_tgt_idx = tgt_idx + max_offset
+    min_src_idx = tgt_idx - max_offset
+    if min_src_idx < 0 or max_tgt_idx > N:
+        return False
+    min_src_drive, _ = frames[min_src_idx].split(' ')
+    max_tgt_drive, _ = frames[max_tgt_idx].split(' ')
+    if tgt_drive == min_src_drive and tgt_drive == max_tgt_drive:
+        return True
+    return False
 
 def main(_):
   _run_inference()
