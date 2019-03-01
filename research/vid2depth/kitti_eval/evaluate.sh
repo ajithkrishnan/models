@@ -1,7 +1,8 @@
 #!/bin/bash
 
-#export PATH_VID2DEPTH=$(pwd)
-#export PATH_KITTI=$(pwd)/data
+export PATH_VID2DEPTH=$(pwd)
+export PATH_KITTI=$(pwd)/data
+export PATH_KITTI_ODOM=$(pwd)/data
 
 python $PATH_VID2DEPTH/kitti_eval/eval_pose.py \
     --pred_dir $PATH_VID2DEPTH/inference_validation_egomotion/ \
