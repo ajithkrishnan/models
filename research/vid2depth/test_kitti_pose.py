@@ -78,12 +78,9 @@ def _run_inference():
   """Runs all images through depth model and saves depth maps."""
   ckpt_basename = os.path.basename(FLAGS.model_ckpt)
   ckpt_modelname = os.path.basename(os.path.dirname(FLAGS.model_ckpt))
-#  output_dir = os.path.join(FLAGS.output_dir,
-#                            FLAGS.kitti_video.replace('/', '_') + '_' +
-#                            ckpt_modelname + '_' + ckpt_basename)
-  output_dir = FLAGS.output_dir
-  if not gfile.Exists(output_dir):
-    gfile.MakeDirs(output_dir)
+
+  if not gfile.Exists(FLAGS.output_dir):
+    gfile.MakeDirs(FLAGS.output_dir)
   inference_model = model.Model(is_training=False,
                                 seq_length=FLAGS.seq_length,
                                 batch_size=FLAGS.batch_size,
@@ -102,7 +99,6 @@ def _run_inference():
       im_files = [os.path.join(FLAGS.kitti_dir, f) for f in im_files]
     else:
       video_path = os.path.join(FLAGS.kitti_dir, 'sequences/', FLAGS.kitti_video)
-#      im_files = gfile.Glob(os.path.join(video_path, 'image_02/data', '*.png'))
       im_files = gfile.Glob(os.path.join(video_path, 'image_2/', '*.png'))
       im_files = [f for f in im_files if 'disp' not in f]
       im_files = sorted(im_files)
@@ -111,129 +107,62 @@ def _run_inference():
 
 #    max_offset = (FLAGS.seq_length - 1)//2
     max_offset = 1
-    if FLAGS.mode == 'egomotion':
-        test_frames = ['%.2d %.6d' % (FLAGS.kitti_video, n) for n in range(im_files)]
-        with open(FLAGS.kitti_dir + 'sequences/%.2d/times.txt' % int(FLAGS.kitti_video), 'r') as f:
-            times = f.readlines()
-        times = np.array([float(s[:-1]) for s in times])
+    test_frames = ['%.2d %.6d' % (FLAGS.kitti_video, n) for n in range(im_files)]
+    with open(FLAGS.kitti_dir + 'sequences/%.2d/times.txt' % int(FLAGS.kitti_video), 'r') as f:
+        times = f.readlines()
+    times = np.array([float(s[:-1]) for s in times])
   
-    with gfile.Open(os.path.join(output_dir, 'inference.txt'), 'w') as inf_egomotion_f:
-      for i in range(0, len(im_files), FLAGS.batch_size):
+    with gfile.Open(os.path.join(FLAGS.output_dir, 'inference.txt'), 'w') as inf_egomotion_f:
+      for tgt_idx in range(0, len(im_files)):
 
         if not is_valid_sample(test_frames, i, FLAGS.seq_length):
           continue
-        if i % 100 == 0:
+        if tgt_idx % 100 == 0:
           logging.info('Generating from %s: %d/%d', ckpt_basename, i,
                       len(im_files))
 
-        inputs_depth = np.zeros(
-            (FLAGS.batch_size, FLAGS.img_height, FLAGS.img_width, 3),
-            dtype=np.uint8)
-        inputs_egomotion = np.zeros(
+        inputs = np.zeros(
             (FLAGS.batch_size, FLAGS.img_height, FLAGS.img_width *  FLAGS.seq_length, 3),
             dtype=np.uint8)
         
-        if FLAGS.mode == 'depth':
-            inputs = inputs_depth
-        elif FLAGS.mode == 'egomotion':
-            inputs = inputs_egomotion
-
-#        for b in range(FLAGS.batch_size):
-#        for b in range(FLAGS.seq_length):
-        b = 0
-        idx = i + b
-        if idx >= len(im_files):
+        if tgt_idx >= len(im_files):
           break
 
-        if FLAGS.mode == 'depth':
-          im = scipy.misc.imread(im_files[idx])
-          inputs[b] = scipy.misc.imresize(im, (FLAGS.img_height, FLAGS.img_width))
-        elif FLAGS.mode == 'egomotion':
-          im = np.hstack(scipy.misc.imread(im_files[j] for j in (idx-max_offset, idx, idx+max_offset))
-          inputs[b] = scipy.misc.imresize(im, (FLAGS.img_height, 
-              FLAGS.img_width * FLAGS.seq_length))
+# TODO: currently assuming batch_size = 1
+
+        image_seq = load_image_sequence(FLAGS.kitti_dir, 
+                                        test_frames, 
+                                        tgt_idx, 
+                                        FLAGS.seq_length, 
+                                        FLAGS.img_height, 
+                                        FLAGS.img_width)
+#            image_seq = scipy.misc.imresize(im, (FLAGS.img_height, 
+#              FLAGS.img_width * FLAGS.seq_length))
         
-#        results = inference_model.inference(inputs, sess, mode=FLAGS.mode)
-        results = inference_model.inference(inputs[None], sess, mode=FLAGS.mode)
 
-#        for b in range(FLAGS.batch_size):
-        for b in range(FLAGS.seq_length):
-          idx = i + b
-          if idx >= len(im_files):
-            break
+        results = inference_model.inference(image_seq[None,:,:,:], sess, mode=FLAGS.mode)
 
-          if FLAGS.mode == 'depth':
-              if FLAGS.kitti_video == 'test_files_eigen':
-                depth_path = os.path.join(output_dir, '%03d.png' % idx)
-              else:
-                depth_path = os.path.join(output_dir, '%04d.png' % idx)
-              depth_map = results['depth'][b]
-              depth_map = np.squeeze(depth_map)
-              colored_map = _normalize_depth_for_display(depth_map, cmap=CMAP)
-              input_float = inputs[b].astype(np.float32) / 255.0
-              vertical_stack = np.concatenate((input_float, colored_map), axis=0)
-              scipy.misc.imsave(depth_path, vertical_stack)
+        egomotion_data = results['egomotion'][0]
+        # Insert target poses
+        # DEBUG: check if the target pose is at the right index
+        egomotion_data = np.insert(egomotion_data, 0, np.zeros((1,6)), axis=0) 
+        egomotion_data = np.insert(egomotion_data, 2, np.zeros((1,6)), axis=0) 
+        curr_times = times[tgt_idx - max_offset:tgt_idx + max_offset + 1]
+        egomotion_file = FLAGS.output_dir + '%.6d.txt' % (tgt_idx - max_offset)
+#        egomotion_path = os.path.join(FLAGS.output_dir, str(egomotion_file))
+        dump_pose_seq_TUM(egomotion_file, egomotion_data, curr_times)
+#        inf_egomotion_f.write("%s\n" % (egomotion_path))
+        #DEBUG
+        if tgt_idx % 100 == 0:
+            print("shape of image_seq: {}".format(image_seq.shape))
+            print("shape of results['egomotion']: {}".format(results['egomotion'].shape))
+            print("shape of results['egomotion'][0]: {}".format(results['egomotion'][0].shape))
+            print("shape of egomotion_data: {}".format(egomotion_data.shape))
+            print(egomotion_path)
 
-          elif FLAGS.mode == 'egomotion':
-#              for j in range(FLAGS.seq_length - 1):
-#                  if FLAGS.kitti_video == 'test_files_eigen':
-#                      egomotion_path = os.path.join(output_dir, '%i%d.txt' % (idx,j))
-#                  else:
-#                      egomotion_path = os.path.join(output_dir, '%04d.txt' % (idx+j))
-#
-#                  egomotion_file = gfile.Open(egomotion_path, 'w')
-#                  egomotion_data = results['egomotion'][b]
-#                  egomotion_data = np.squeeze(egomotion_data)
-#                  egomotion_file.write(' '.join(str(d) for d in egomotion_data[j]))
-
-                  # DEBUG just an index or does it refer to the target frame
-#              tgt_idx = idx + j
-              egomotion_data = results['egomotion'][0]
-              print("shape of results['egomotion']: {}".format(results['egomotion'].shape))
-              print("shape of results['egomotion'][0]: {}".format(results['egomotion'][0].shape))
-              # Insert target poses
-              # DEBUG: check if the target pose is at the right index
-              egomotion_data = np.insert(egomotion_data, 0, np.zeros((1,6)), axis=0) 
-              egomotion_data = np.insert(egomotion_data, 2, np.zeros((1,6)), axis=0) 
-              print("shape of egomotion_data: {}".format(egomotion_data.shape))
-              curr_times = times[tgt_idx - max_offset:tgt_idx + max_offset + 1]
-              #egomotion_file = output_dir + '%.6d.txt' % (tgt_idx - max_src_offset)
-              egomotion_file = output_dir + '%.6d.txt' % (tgt_idx - 1)
-              egomotion_path = os.path.join(FLAGS.output_dir, str(egomotion_file))
-              print(egomotion_path)
-              dump_pose_seq_TUM(egomotion_path, egomotion_data, curr_times)
-              inf_egomotion_f.write("%s\n" % (egomotion_path))
-
-              # DEBUG : confirm if this is needed
+          # DEBUG : confirm if this is needed
 #                  if egomotion_file is not None:
 #                      egomotion_file.close()
-     
-
-
-def _gray2rgb(im, cmap=CMAP):
-  cmap = plt.get_cmap(cmap)
-  rgba_img = cmap(im.astype(np.float32))
-  rgb_img = np.delete(rgba_img, 3, 2)
-  return rgb_img
-
-
-def _normalize_depth_for_display(depth,
-                                 pc=95,
-                                 crop_percent=0,
-                                 normalizer=None,
-                                 cmap=CMAP):
-  """Converts a depth map to an RGB image."""
-  # Convert to disparity.
-  disp = 1.0 / (depth + 1e-6)
-  if normalizer is not None:
-    disp /= normalizer
-  else:
-    disp /= (np.percentile(disp, pc) + 1e-6)
-  disp = np.clip(disp, 0, 1)
-  disp = _gray2rgb(disp, cmap=cmap)
-  keep_h = int(disp.shape[0] * (1 - crop_percent))
-  disp = disp[:keep_h]
-  return disp
 
 
 def load_image_sequence(dataset_dir, 
@@ -242,15 +171,16 @@ def load_image_sequence(dataset_dir,
                         seq_length, 
                         img_height, 
                         img_width):
-    half_offset = int((seq_length - 1)/2)
-    for o in range(-half_offset, half_offset+1):
+#    max_offset = int((seq_length - 1)/2)
+    max_offset = 1
+    for o in range(-max_offset, max_offset+1):
         curr_idx = tgt_idx + o
         curr_drive, curr_frame_id = frames[curr_idx].split(' ')
         img_file = os.path.join(
             dataset_dir, 'sequences', '%s/image_2/%s.png' % (curr_drive, curr_frame_id))
         curr_img = scipy.misc.imread(img_file)
         curr_img = scipy.misc.imresize(curr_img, (img_height, img_width))
-        if o == -half_offset:
+        if o == -max_offset:
             image_seq = curr_img
         else:
             image_seq = np.hstack((image_seq, curr_img))
@@ -272,6 +202,7 @@ def is_valid_sample(frames, tgt_idx, seq_length):
     if tgt_drive == min_src_drive and tgt_drive == max_tgt_drive:
         return True
     return False
+
 
 def main(_):
   _run_inference()
