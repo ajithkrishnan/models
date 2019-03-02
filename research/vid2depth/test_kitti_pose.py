@@ -107,7 +107,7 @@ def _run_inference():
 
 #    max_offset = (FLAGS.seq_length - 1)//2
     max_offset = 1
-    test_frames = ['%.2d %.6d' % (FLAGS.kitti_video, n) for n in range(im_files)]
+    test_frames = ['%.2d %.6d' % (int(FLAGS.kitti_video), n) for n in range(len(im_files))]
     with open(FLAGS.kitti_dir + 'sequences/%.2d/times.txt' % int(FLAGS.kitti_video), 'r') as f:
         times = f.readlines()
     times = np.array([float(s[:-1]) for s in times])
@@ -115,18 +115,16 @@ def _run_inference():
     with gfile.Open(os.path.join(FLAGS.output_dir, 'inference.txt'), 'w') as inf_egomotion_f:
       for tgt_idx in range(0, len(im_files)):
 
-        if not is_valid_sample(test_frames, i, FLAGS.seq_length):
+        if not is_valid_sample(test_frames, tgt_idx, FLAGS.seq_length):
           continue
         if tgt_idx % 100 == 0:
-          logging.info('Generating from %s: %d/%d', ckpt_basename, i,
+          logging.info('Generating from %s: %d/%d', ckpt_basename, tgt_idx,
                       len(im_files))
 
         inputs = np.zeros(
             (FLAGS.batch_size, FLAGS.img_height, FLAGS.img_width *  FLAGS.seq_length, 3),
             dtype=np.uint8)
         
-        if tgt_idx >= len(im_files):
-          break
 
 # TODO: currently assuming batch_size = 1
 
@@ -145,8 +143,9 @@ def _run_inference():
         egomotion_data = results['egomotion'][0]
         # Insert target poses
         # DEBUG: check if the target pose is at the right index
-        egomotion_data = np.insert(egomotion_data, 0, np.zeros((1,6)), axis=0) 
-        egomotion_data = np.insert(egomotion_data, 2, np.zeros((1,6)), axis=0) 
+#        egomotion_data = np.insert(egomotion_data, 0, np.zeros((1,6)), axis=0) 
+#        egomotion_data = np.insert(egomotion_data, 2, np.zeros((1,6)), axis=0) 
+        egomotion_data = np.insert(egomotion_data, max_offset, np.zeros((1,6)), axis=0) 
         curr_times = times[tgt_idx - max_offset:tgt_idx + max_offset + 1]
         egomotion_file = FLAGS.output_dir + '%.6d.txt' % (tgt_idx - max_offset)
 #        egomotion_path = os.path.join(FLAGS.output_dir, str(egomotion_file))
@@ -158,7 +157,8 @@ def _run_inference():
             print("shape of results['egomotion']: {}".format(results['egomotion'].shape))
             print("shape of results['egomotion'][0]: {}".format(results['egomotion'][0].shape))
             print("shape of egomotion_data: {}".format(egomotion_data.shape))
-            print(egomotion_path)
+            print("shape of curr_times: {}".format(curr_times.shape))
+#            print(egomotion_path)
 
           # DEBUG : confirm if this is needed
 #                  if egomotion_file is not None:
@@ -189,17 +189,20 @@ def load_image_sequence(dataset_dir,
 
 def is_valid_sample(frames, tgt_idx, seq_length):
     N = len(frames)
+
+    if tgt_idx >= N:
+      return False
     tgt_drive, _ = frames[tgt_idx].split(' ')
     #TODO: calculate max_offset in a clean way 
 #    max_offset = (seq_length - 1)//2
     max_offset = 1
-    max_tgt_idx = tgt_idx + max_offset
     min_src_idx = tgt_idx - max_offset
-    if min_src_idx < 0 or max_tgt_idx > N:
+    max_src_idx = tgt_idx + max_offset
+    if min_src_idx < 0 or max_src_idx >= N:
         return False
     min_src_drive, _ = frames[min_src_idx].split(' ')
-    max_tgt_drive, _ = frames[max_tgt_idx].split(' ')
-    if tgt_drive == min_src_drive and tgt_drive == max_tgt_drive:
+    max_src_drive, _ = frames[max_src_idx].split(' ')
+    if tgt_drive == min_src_drive and tgt_drive == max_src_drive:
         return True
     return False
 

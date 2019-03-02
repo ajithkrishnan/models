@@ -370,11 +370,14 @@ def pose_vec_to_mat(vec):
 
 def dump_pose_seq_TUM(out_file, poses, times):
     # First frame as the origin
-    first_pose = pose_vec_to_mat(poses[0])
+    first_origin = pose_vec_to_mat(poses[0])
     with open(out_file, 'w') as f:
         for p in range(len(times)):
             this_pose = pose_vec_to_mat(poses[p])
-            this_pose = np.dot(first_pose, np.linalg.inv(this_pose))
+            # DEBUG: Dirty fix
+            if p == 2:
+                this_pose = np.linalg.inv(this_pose)
+            this_pose = np.dot(first_origin, np.linalg.inv(this_pose))
             tx = this_pose[0, 3]
             ty = this_pose[1, 3]
             tz = this_pose[2, 3]
