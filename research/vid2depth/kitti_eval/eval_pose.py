@@ -4,7 +4,6 @@ import numpy as np
 import argparse
 from glob import glob
 from pose_evaluation_utils import *
-from absl import logging
 import csv
 
 parser = argparse.ArgumentParser()

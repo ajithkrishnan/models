@@ -24,103 +24,119 @@ from absl import app
 from absl import flags
 from absl import logging
 import matplotlib.pyplot as plt
-import model
 import numpy as np
-import scipy.misc
-import tensorflow as tf
-import util
-from kitti_eval.pose_evaluation_utils import dump_pose_seq_TUM
+#import util
 import csv
-
-gfile = tf.gfile
+from pose_evaluation_utils import pose_vec_to_mat, rot2quat
 
 HOME_DIR = os.path.expanduser('~')
-DEFAULT_OUTPUT_DIR = os.path.join(HOME_DIR, 'vid2depth/inference')
-DEFAULT_KITTI_DIR = os.path.join(HOME_DIR, 'kitti-raw-uncompressed')
-DEFAULT_MODE = 'depth'
 
-flags.DEFINE_string('output_dir', DEFAULT_OUTPUT_DIR,
+flags.DEFINE_string('output_dir', None,
                     'Directory to store estimated depth maps.')
-flags.DEFINE_string('gt_dir', DEFAULT_KITTI_DIR, 'KITTI dataset directory.')
+flags.DEFINE_string('gt_dir', None, 'KITTI dataset directory.')
 flags.DEFINE_string('kitti_sequence', None, 'KITTI video directory name.')
 flags.DEFINE_integer('seq_length', 3, 'Sequence length for each example.')
-flags.DEFINE_string('mode', DEFAULT_MODE, 'Specify the network to run inference on i.e depth or pose' )
 
 FLAGS = flags.FLAGS
 
 flags.mark_flag_as_required('gt_dir')
+flags.mark_flag_as_required('output_dir')
 flags.mark_flag_as_required('kitti_sequence')
-flags.mark_flag_as_required('seq_length')
 
 
 def _gen_data():
 
-    gt_path = os.path.join(FLAGS.kitti_dir, '%.2d_full.txt' % FLAGS.kitti_sequence)
-    if not os.path.exists(gt_path) :
-        break
-    else:
+    gt_path = os.path.join(FLAGS.gt_dir, '%.2d_full.txt' % int(FLAGS.kitti_sequence))
+    if not os.path.exists(FLAGS.output_dir):
+        os.makedirs(FLAGS.output_dir)
+
+    if os.path.exists(gt_path) :
+        gt_list = []
+        times = []
+
         with open(gt_path) as gt_file:
-            gt_reader = list(csv.reader(gt_file, delimiter=' '))
+            gt_list = list(csv.reader(gt_file, delimiter=' '))
 
-            times = []
-            for j, _ in enumerate(gt_reader):
-                gt_reader[j] = [float(i) for i in gt_reader[j]]
-                times.append(g_row[0])
+        for j, _ in enumerate(gt_list):
+            gt_list[j] = [float(i) for i in gt_list[j]]
+            times.append(gt_list[j][0])
 
-    #        max_offset = (FLAGS.seq_length - 1)//2
-            gt_reader = np.array(gt_reader)
-            times = np.array(times)
-            test_frames = ['%.2d %.6d' % (int(FLAGS.kitti_sequence), n) for n in range(len(gt_reader))]
-            max_offset = 1
-          
-            for tgt_idx in range(0, len(gt_reader)):
+#        max_offset = (FLAGS.seq_length - 1)//2
+        gt_array = np.array(gt_list)
+        gt_array = np.delete(gt_array, 0 , axis=1)
+        times = np.array(times)
+        test_frames = ['%.2d %.6d' % (int(FLAGS.kitti_sequence), n) for n in range(len(gt_list))]
+        max_offset = 1
+      
+        for tgt_idx in range(0, len(gt_list)):
 
-                if not is_valid_sample(test_frames, tgt_idx, FLAGS.seq_length):
-                  continue
-                if tgt_idx % 100 == 0:
-                  logging.info('Generating from %s: %d/%d', gt_path, tgt_idx,
-                              len(gt_reader))
+            if not is_valid_sample(test_frames, tgt_idx, FLAGS.seq_length):
+              continue
+            if tgt_idx % 100 == 0:
+              logging.info('Generating: %d/%d', tgt_idx,
+                          len(gt_list))
 
-                # TODO: currently assuming batch_size = 1
+            # TODO: currently assuming batch_size = 1
 
-                pose_seq = load_sequence(FLAGS.gt_dir, 
-                                                test_frames, 
-                                                tgt_idx, 
-                                                FLAGS.seq_length)
+            egomotion_data = load_sequence(FLAGS.gt_dir, 
+                                            tgt_idx, 
+                                            gt_array, 
+                                            FLAGS.seq_length)
 
-                egomotion_data = pose_seq
-                # Insert target poses
-                # DEBUG: check if the target pose is at the right index
-                #        egomotion_data = np.insert(egomotion_data, 0, np.zeros((1,6)), axis=0) 
-                #        egomotion_data = np.insert(egomotion_data, 2, np.zeros((1,6)), axis=0) 
-                egomotion_data = np.insert(egomotion_data, max_offset, np.zeros((1,6)), axis=0) 
-                curr_times = times[tgt_idx - max_offset:tgt_idx + max_offset + 1]
-                egomotion_file = FLAGS.output_dir + '%.6d.txt' % (tgt_idx - max_offset)
-                #        egomotion_path = os.path.join(FLAGS.output_dir, str(egomotion_file))
-                for j, g_row in enumerate(gt_reader):
-                with open(os.path.join(FLAGS.output_dir, '%.6d.txt' % j),'w') as f:
-                        writer = csv.writer(f, delimiter=' ')
-                #                        writer.writerows(pose_seq)
-                        writer.writerow(pose_seq)
+            # Insert target poses
+            # DEBUG: check if the target pose is at the right index
+            #        egomotion_data = np.insert(egomotion_data, 0, np.zeros((1,6)), axis=0) 
+            #        egomotion_data = np.insert(egomotion_data, 2, np.zeros((1,6)), axis=0) 
+#            zero_pose = np.zeros((1,8))
+#            zero_pose[0][0] = gt_array[tgt_idx][0]
+            zero_pose = np.zeros((1,7))
+            egomotion_data = np.insert(egomotion_data, max_offset, zero_pose, axis=0) 
+            # DEBUG
+            if tgt_idx % 100 == 0:
+                print("shape of egomotion_data: {}".format(egomotion_data.shape))
+                print("shape of gt_array: {}".format(gt_array.shape))
+            curr_times = times[tgt_idx - max_offset:tgt_idx + max_offset + 1]
+            egomotion_file = FLAGS.output_dir + '%.6d.txt' % (tgt_idx - max_offset)
+            dump_pose_seq_TUM(egomotion_file, egomotion_data, curr_times)
+#            #        egomotion_path = os.path.join(FLAGS.output_dir, str(egomotion_file))
+#            for j, g_row in enumerate(gt_list):
+#                with open(os.path.join(FLAGS.output_dir, '%.6d.txt' % j),'w') as f:
+#                    writer = csv.writer(f, delimiter=' ')
+#    #                writer.writerows(pose_seq)
+#                    writer.writerow(pose_seq)
 
+
+def dump_pose_seq_TUM(out_file, poses, times):
+    # Set first frame as the origin
+    first_origin = pose_vec_to_mat(poses[0])
+    with open(out_file, 'w') as f:
+        for p in range(len(times)):
+            this_pose = pose_vec_to_mat(poses[p])
+            this_pose = np.dot(first_origin, np.linalg.inv(this_pose))
+            tx = this_pose[0, 3]
+            ty = this_pose[1, 3]
+            tz = this_pose[2, 3]
+            rot = this_pose[:3, :3]
+            qw, qx, qy, qz = rot2quat(rot)
+            f.write('%f %f %f %f %f %f %f %f\n' % (times[p], tx, ty, tz, qx, qy, qz, qw))
 
 def load_sequence(dataset_dir, 
-                        frames, 
                         tgt_idx, 
-                        seq_length)
+                        gt_array, 
+                        seq_length):
 #    max_offset = int((seq_length - 1)/2)
     max_offset = 1
-    for o in range(-max_offset, max_offset+1):
+#    for o in range(-max_offset, max_offset+1):
+    # DEBUG: Dirty Fix
+    for o in range(0, 2):
         curr_idx = tgt_idx + o
-        curr_drive, curr_frame_id = frames[curr_idx].split(' ')
-        pose_file = os.path.join(
-            dataset_dir, 'sequences', '%s/image_2/%s.png' % (curr_drive, curr_frame_id))
-        curr_img = scipy.misc.imread(img_file)
-        if o == -max_offset:
-            image_seq = curr_img
+        curr_pose = gt_array[curr_idx]
+#        if o == -max_offset:
+        if o == 0:
+            pose_seq = curr_pose 
         else:
-            image_seq = np.hstack((image_seq, curr_img))
-    return image_seq
+            pose_seq = np.vstack((pose_seq, curr_pose))
+    return pose_seq
 
 
 def is_valid_sample(frames, tgt_idx, seq_length):
@@ -145,3 +161,6 @@ def is_valid_sample(frames, tgt_idx, seq_length):
 
 def main(_):
   _gen_data()
+
+if __name__ == '__main__':
+    app.run(main)
