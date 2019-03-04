@@ -27,7 +27,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 #import util
 import csv
-from pose_evaluation_utils import pose_vec_to_mat, rot2quat
+from pose_evaluation_utils import rot2quat
+import math
+
+FLOAT_EPS = np.finfo(np.float).eps
 
 HOME_DIR = os.path.expanduser('~')
 
@@ -105,6 +108,95 @@ def _gen_data():
 #    #                writer.writerows(pose_seq)
 #                    writer.writerow(pose_seq)
 
+
+#DEBUG
+#def quat2rot(quaternion):
+#    """Return homogeneous rotation matrix from quaternion.
+#
+#    >>> M = quaternion_matrix([0.99810947, 0.06146124, 0, 0])
+#    >>> numpy.allclose(M, rotation_matrix(0.123, [1, 0, 0]))
+#    True
+#    >>> M = quaternion_matrix([1, 0, 0, 0])
+#    >>> numpy.allclose(M, numpy.identity(4))
+#    True
+#    >>> M = quaternion_matrix([0, 1, 0, 0])
+#    >>> numpy.allclose(M, numpy.diag([1, -1, -1, 1]))
+#    True
+#
+#    """
+#    q = np.array(quaternion, dtype=np.float64, copy=True)
+#    n = np.dot(q, q)
+##    if n < _EPS:
+##        return np.identity(4)
+#    q *= math.sqrt(2.0 / n)
+#    q = np.outer(q, q)
+#    return np.array([
+#        [1.0-q[2, 2]-q[3, 3],     q[1, 2]-q[3, 0],     q[1, 3]+q[2, 0]],
+#        [    q[1, 2]+q[3, 0], 1.0-q[1, 1]-q[3, 3],     q[2, 3]-q[1, 0]],
+#        [    q[1, 3]-q[2, 0],     q[2, 3]+q[1, 0], 1.0-q[1, 1]-q[2, 2]]])
+
+
+def quat2mat(q):
+    ''' Calculate rotation matrix corresponding to quaternion
+
+    Parameters
+    ----------
+    q : 4 element array-like
+
+    Returns
+    -------
+    M : (3,3) array
+      Rotation matrix corresponding to input quaternion *q*
+
+    Notes
+    -----
+    Rotation matrix applies to column vectors, and is applied to the
+    left of coordinate vectors.  The algorithm here allows non-unit
+    quaternions.
+
+    References
+    ----------
+    Algorithm from
+    http://en.wikipedia.org/wiki/Rotation_matrix#Quaternion
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> M = quat2mat([1, 0, 0, 0]) # Identity quaternion
+    >>> np.allclose(M, np.eye(3))
+    True
+    >>> M = quat2mat([0, 1, 0, 0]) # 180 degree rotn around axis 0
+    >>> np.allclose(M, np.diag([1, -1, -1]))
+    True
+    '''
+    w, x, y, z = q
+    Nq = w*w + x*x + y*y + z*z
+    if Nq < FLOAT_EPS:
+        return np.eye(3)
+    s = 2.0/Nq
+    X = x*s
+    Y = y*s
+    Z = z*s
+    wX = w*X; wY = w*Y; wZ = w*Z
+    xX = x*X; xY = x*Y; xZ = x*Z
+    yY = y*Y; yZ = y*Z; zZ = z*Z
+    return np.array(
+           [[ 1.0-(yY+zZ), xY-wZ, xZ+wY ],
+            [ xY+wZ, 1.0-(xX+zZ), yZ-wX ],
+            [ xZ-wY, yZ+wX, 1.0-(xX+yY) ]])
+
+
+def pose_vec_to_mat(vec):
+    tx = vec[0]
+    ty = vec[1]
+    tz = vec[2]
+    trans = np.array([tx, ty, tz]).reshape((3,1))
+    rot = quat2mat([vec[6], vec[5], vec[4], vec[3]])
+#    rot = quat2rot([vec[3], vec[4], vec[5], vec[6]])
+    Tmat = np.concatenate((rot, trans), axis=1)
+    hfiller = np.array([0, 0, 0, 1]).reshape((1,4))
+    Tmat = np.concatenate((Tmat, hfiller), axis=0)
+    return Tmat
 
 def dump_pose_seq_TUM(out_file, poses, times):
     # Set first frame as the origin
