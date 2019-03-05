@@ -1,5 +1,5 @@
 import numpy as np
-from pose_evaluation_utils import rot2quat
+from kitti_eval.pose_evaluation_utils import rot2quat
 
 #DEBUG
 #def quat2rot(quaternion):
@@ -114,8 +114,7 @@ def load_sequence(dataset_dir,
 #    max_offset = int((seq_length - 1)/2)
     max_offset = 1
 #    for o in range(-max_offset, max_offset+1):
-    for o in range(0, max_offset + 1):
-        print(o)
+    for o in range(0, max_offset + 2):
         curr_idx = tgt_idx + o
         curr_pose = gt_array[curr_idx]
 #        if o == -max_offset:
@@ -135,8 +134,10 @@ def is_valid_sample(frames, tgt_idx, seq_length):
     #TODO: calculate max_offset in a clean way 
 #    max_offset = (seq_length - 1)//2
     max_offset = 1
-    min_src_idx = tgt_idx - max_offset
-    max_src_idx = tgt_idx + max_offset
+#    min_src_idx = tgt_idx - max_offset
+#    max_src_idx = tgt_idx + max_offset
+    min_src_idx = tgt_idx 
+    max_src_idx = tgt_idx + 2*max_offset
     if min_src_idx < 0 or max_src_idx >= N:
         return False
     min_src_drive, _ = frames[min_src_idx].split(' ')

@@ -26,7 +26,7 @@ from absl import logging
 import numpy as np
 #import util
 import csv
-from process_gtruth_utils import dump_pose_seq_TUM
+from process_gtruth_utils import dump_pose_seq_TUM, is_valid_sample, load_sequence
 import math
 
 FLOAT_EPS = np.finfo(np.float).eps
@@ -35,8 +35,8 @@ HOME_DIR = os.path.expanduser('~')
 
 flags.DEFINE_string('output_dir', None,
                     'Directory to store estimated depth maps.')
-flags.DEFINE_string('gt_dir', None, 'KITTI dataset directory.')
-flags.DEFINE_string('kitti_dir', DEFAULT_KITTI_DIR, 'KITTI dataset directory.')
+flags.DEFINE_string('gt_dir', None, 'KITTI groundtruth directory.')
+flags.DEFINE_string('kitti_dir', None, 'KITTI dataset directory.')
 flags.DEFINE_integer('kitti_sequence', None, 'KITTI video directory name.')
 flags.DEFINE_integer('seq_length', 3, 'Sequence length for each example.')
 
@@ -51,7 +51,7 @@ def _gen_data():
 
     # DEBUG
 #    gt_path = os.path.join(FLAGS.gt_dir, '%.2d_full.txt' % FLAGS.kitti_sequence)
-    gt_path = os.path.join(FLAGS.kitti_dir, 'poses/%.2d.txt' % FLAGS.kitti_sequence)
+    gt_path = os.path.join(FLAGS.gt_dir, 'poses/%.2d.txt' % FLAGS.kitti_sequence)
 
     if not os.path.exists(FLAGS.output_dir):
         os.makedirs(FLAGS.output_dir)
@@ -74,7 +74,7 @@ def _gen_data():
 #        gt_array = np.delete(gt_array, 0 , axis=1)
 #        times = np.array(times)
       
-        with open(FLAGS.kitti_dir + 'sequences/%.2d/times.txt' % int(FLAGS.kitti_video), 'r') as f:
+        with open(FLAGS.kitti_dir + 'sequences/%.2d/times.txt' % FLAGS.kitti_sequence, 'r') as f:
             times = f.readlines()
         times = np.array([float(s[:-1]) for s in times])
 
@@ -95,21 +95,13 @@ def _gen_data():
                                             tgt_idx, 
                                             gt_array, 
                                             FLAGS.seq_length)
-
             # DEBUG
             if tgt_idx % 100 == 0:
                 print("shape of egomotion_data: {}".format(egomotion_data.shape))
                 print("shape of gt_array: {}".format(gt_array.shape))
-            curr_times = times[tgt_idx - max_offset:tgt_idx + max_offset + 1]
             egomotion_file = FLAGS.output_dir + '%.6d.txt' % (tgt_idx - max_offset)
+            curr_times = times[tgt_idx - max_offset:tgt_idx + max_offset + 1]
             dump_pose_seq_TUM(egomotion_file, egomotion_data, curr_times)
-#            #        egomotion_path = os.path.join(FLAGS.output_dir, str(egomotion_file))
-#            for j, g_row in enumerate(gt_list):
-#                with open(os.path.join(FLAGS.output_dir, '%.6d.txt' % j),'w') as f:
-#                    writer = csv.writer(f, delimiter=' ')
-#    #                writer.writerows(pose_seq)
-#                    writer.writerow(pose_seq)
-
 
 
 def main(_):
