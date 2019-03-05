@@ -59,7 +59,7 @@ flags.DEFINE_string('output_dir', DEFAULT_OUTPUT_DIR,
                     'Directory to store estimated depth maps.')
 flags.DEFINE_string('kitti_dir', DEFAULT_KITTI_DIR, 'KITTI dataset directory.')
 flags.DEFINE_string('model_ckpt', None, 'Model checkpoint to load.')
-flags.DEFINE_string('kitti_video', None, 'KITTI video directory name.')
+flags.DEFINE_integer('kitti_sequence', None, 'KITTI video directory name.')
 flags.DEFINE_integer('batch_size', 4, 'The size of a sample batch.')
 flags.DEFINE_integer('img_height', 128, 'Image height.')
 flags.DEFINE_integer('img_width', 416, 'Image width.')
@@ -68,7 +68,7 @@ flags.DEFINE_string('mode', DEFAULT_MODE, 'Specify the network to run inference 
 
 FLAGS = flags.FLAGS
 
-flags.mark_flag_as_required('kitti_video')
+flags.mark_flag_as_required('kitti_sequence')
 flags.mark_flag_as_required('model_ckpt')
 
 CMAP = 'plasma'
@@ -93,12 +93,12 @@ def _run_inference():
 
   with sv.managed_session() as sess:
     saver.restore(sess, FLAGS.model_ckpt)
-    if FLAGS.kitti_video == 'test_files_eigen':
+    if FLAGS.kitti_sequence == 'test_files_eigen':
       im_files = util.read_text_lines(
           util.get_resource_path('dataset/kitti/test_files_eigen.txt'))
       im_files = [os.path.join(FLAGS.kitti_dir, f) for f in im_files]
     else:
-      video_path = os.path.join(FLAGS.kitti_dir, 'sequences/', FLAGS.kitti_video)
+      video_path = os.path.join(FLAGS.kitti_dir, 'sequences/%.2d/' % FLAGS.kitti_sequence)
       im_files = gfile.Glob(os.path.join(video_path, 'image_2/', '*.png'))
       im_files = [f for f in im_files if 'disp' not in f]
       im_files = sorted(im_files)
@@ -107,8 +107,8 @@ def _run_inference():
 
 #    max_offset = (FLAGS.seq_length - 1)//2
     max_offset = 1
-    test_frames = ['%.2d %.6d' % (int(FLAGS.kitti_video), n) for n in range(len(im_files))]
-    with open(FLAGS.kitti_dir + 'sequences/%.2d/times.txt' % int(FLAGS.kitti_video), 'r') as f:
+    test_frames = ['%.2d %.6d' % (FLAGS.kitti_sequence, n) for n in range(len(im_files))]
+    with open(FLAGS.kitti_dir + 'sequences/%.2d/times.txt' % FLAGS.kitti_sequence, 'r') as f:
         times = f.readlines()
     times = np.array([float(s[:-1]) for s in times])
   
@@ -134,8 +134,6 @@ def _run_inference():
                                         FLAGS.seq_length, 
                                         FLAGS.img_height, 
                                         FLAGS.img_width)
-#            image_seq = scipy.misc.imresize(im, (FLAGS.img_height, 
-#              FLAGS.img_width * FLAGS.seq_length))
         
 
         results = inference_model.inference(image_seq[None,:,:,:], sess, mode=FLAGS.mode)
@@ -148,7 +146,7 @@ def _run_inference():
         egomotion_data = np.insert(egomotion_data, max_offset, np.zeros((1,6)), axis=0) 
         curr_times = times[tgt_idx - max_offset:tgt_idx + max_offset + 1]
         egomotion_file = FLAGS.output_dir + '%.6d.txt' % (tgt_idx - max_offset)
-#        egomotion_path = os.path.join(FLAGS.output_dir, str(egomotion_file))
+        # DEBUG
         dump_pose_seq_TUM(egomotion_file, egomotion_data, curr_times)
 #        inf_egomotion_f.write("%s\n" % (egomotion_path))
         #DEBUG
@@ -158,12 +156,6 @@ def _run_inference():
             print("shape of results['egomotion'][0]: {}".format(results['egomotion'][0].shape))
             print("shape of egomotion_data: {}".format(egomotion_data.shape))
             print("shape of curr_times: {}".format(curr_times.shape))
-#            print(egomotion_path)
-
-          # DEBUG : confirm if this is needed
-#                  if egomotion_file is not None:
-#                      egomotion_file.close()
-
 
 def load_image_sequence(dataset_dir, 
                         frames, 
