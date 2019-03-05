@@ -37,7 +37,8 @@ HOME_DIR = os.path.expanduser('~')
 flags.DEFINE_string('output_dir', None,
                     'Directory to store estimated depth maps.')
 flags.DEFINE_string('gt_dir', None, 'KITTI dataset directory.')
-flags.DEFINE_string('kitti_sequence', None, 'KITTI video directory name.')
+flags.DEFINE_string('kitti_dir', DEFAULT_KITTI_DIR, 'KITTI dataset directory.')
+flags.DEFINE_integer('kitti_sequence', None, 'KITTI video directory name.')
 flags.DEFINE_integer('seq_length', 3, 'Sequence length for each example.')
 
 FLAGS = flags.FLAGS
@@ -49,7 +50,10 @@ flags.mark_flag_as_required('kitti_sequence')
 
 def _gen_data():
 
-    gt_path = os.path.join(FLAGS.gt_dir, '%.2d_full.txt' % int(FLAGS.kitti_sequence))
+    # DEBUG
+#    gt_path = os.path.join(FLAGS.gt_dir, '%.2d_full.txt' % FLAGS.kitti_sequence)
+    gt_path = os.path.join(FLAGS.kitti_dir, 'poses/%.2d.txt' % FLAGS.kitti_sequence)
+
     if not os.path.exists(FLAGS.output_dir):
         os.makedirs(FLAGS.output_dir)
 
@@ -62,15 +66,22 @@ def _gen_data():
 
         for j, _ in enumerate(gt_list):
             gt_list[j] = [float(i) for i in gt_list[j]]
-            times.append(gt_list[j][0])
+            # DEBUG
+#            times.append(gt_list[j][0])
 
 #        max_offset = (FLAGS.seq_length - 1)//2
         gt_array = np.array(gt_list)
-        gt_array = np.delete(gt_array, 0 , axis=1)
-        times = np.array(times)
+        # DEBUG
+#        gt_array = np.delete(gt_array, 0 , axis=1)
+#        times = np.array(times)
+      
+        with open(FLAGS.kitti_dir + 'sequences/%.2d/times.txt' % int(FLAGS.kitti_video), 'r') as f:
+            times = f.readlines()
+        times = np.array([float(s[:-1]) for s in times])
+
         test_frames = ['%.2d %.6d' % (int(FLAGS.kitti_sequence), n) for n in range(len(gt_list))]
         max_offset = 1
-      
+
         for tgt_idx in range(0, len(gt_list)):
 
             if not is_valid_sample(test_frames, tgt_idx, FLAGS.seq_length):
@@ -92,7 +103,10 @@ def _gen_data():
             #        egomotion_data = np.insert(egomotion_data, 2, np.zeros((1,6)), axis=0) 
 #            zero_pose = np.zeros((1,8))
 #            zero_pose[0][0] = gt_array[tgt_idx][0]
-            zero_pose = np.zeros((1,7))
+            # DEBUG
+#            zero_pose = np.zeros((1,7))
+            zero_pose = np.zeros((1,11))
+            zero_pose[0] = 1.0
             egomotion_data = np.insert(egomotion_data, max_offset, zero_pose, axis=0) 
             # DEBUG
             if tgt_idx % 100 == 0:
@@ -186,13 +200,19 @@ def quat2mat(q):
             [ xZ-wY, yZ+wX, 1.0-(xX+yY) ]])
 
 
+def convert2mat(vec):
+    return np.array(
+            [[ vec[0], vec[1], vec[2] ],
+             [ vec[4], vec[5], vec[6] ],
+             [ vec[8], vec[9], vec[10] ]])
+
 def pose_vec_to_mat(vec):
     tx = vec[0]
     ty = vec[1]
     tz = vec[2]
     trans = np.array([tx, ty, tz]).reshape((3,1))
-    rot = quat2mat([vec[6], vec[5], vec[4], vec[3]])
-#    rot = quat2rot([vec[3], vec[4], vec[5], vec[6]])
+#    rot = quat2mat([vec[6], vec[5], vec[4], vec[3]])
+    rot = convert2mat(vec)
     Tmat = np.concatenate((rot, trans), axis=1)
     hfiller = np.array([0, 0, 0, 1]).reshape((1,4))
     Tmat = np.concatenate((Tmat, hfiller), axis=0)
