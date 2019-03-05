@@ -99,8 +99,11 @@ def _gen_data():
             if tgt_idx % 100 == 0:
                 print("shape of egomotion_data: {}".format(egomotion_data.shape))
                 print("shape of gt_array: {}".format(gt_array.shape))
-            egomotion_file = FLAGS.output_dir + '%.6d.txt' % (tgt_idx - max_offset)
-            curr_times = times[tgt_idx - max_offset:tgt_idx + max_offset + 1]
+            # DEBUG
+#            egomotion_file = FLAGS.output_dir + '%.6d.txt' % (tgt_idx - max_offset)
+#            curr_times = times[tgt_idx - max_offset:tgt_idx + max_offset + 1]
+            egomotion_file = FLAGS.output_dir + '%.6d.txt' % (tgt_idx)
+            curr_times = times[tgt_idx:tgt_idx + max_offset + 2]
             dump_pose_seq_TUM(egomotion_file, egomotion_data, curr_times)
 
 
