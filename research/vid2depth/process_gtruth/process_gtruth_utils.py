@@ -78,19 +78,16 @@ def quat2mat(q):
             [ xZ-wY, yZ+wX, 1.0-(xX+yY) ]])
 
 
-def convert2mat(vec):
-    return np.array(
-            [[ vec[0], vec[1], vec[2] ],
-             [ vec[4], vec[5], vec[6] ],
-             [ vec[8], vec[9], vec[10] ]])
-
 def pose_vec_to_mat(vec):
     tx = vec[0]
     ty = vec[1]
     tz = vec[2]
     trans = np.array([tx, ty, tz]).reshape((3,1))
 #    rot = quat2mat([vec[6], vec[5], vec[4], vec[3]])
-    rot = convert2mat(vec)
+    rot = np.array(
+            [[ vec[0], vec[1], vec[2] ],
+             [ vec[4], vec[5], vec[6] ],
+             [ vec[8], vec[9], vec[10] ]]).reshape((3,3))
     Tmat = np.concatenate((rot, trans), axis=1)
     hfiller = np.array([0, 0, 0, 1]).reshape((1,4))
     Tmat = np.concatenate((Tmat, hfiller), axis=0)
@@ -117,8 +114,8 @@ def load_sequence(dataset_dir,
 #    max_offset = int((seq_length - 1)/2)
     max_offset = 1
 #    for o in range(-max_offset, max_offset+1):
-    # DEBUG: Dirty Fix
-    for o in range(0, 2):
+    for o in range(0, max_offset + 1):
+        print(o)
         curr_idx = tgt_idx + o
         curr_pose = gt_array[curr_idx]
 #        if o == -max_offset:

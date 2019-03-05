@@ -96,17 +96,6 @@ def _gen_data():
                                             gt_array, 
                                             FLAGS.seq_length)
 
-            # Insert target poses
-            # DEBUG: check if the target pose is at the right index
-            #        egomotion_data = np.insert(egomotion_data, 0, np.zeros((1,6)), axis=0) 
-            #        egomotion_data = np.insert(egomotion_data, 2, np.zeros((1,6)), axis=0) 
-#            zero_pose = np.zeros((1,8))
-#            zero_pose[0][0] = gt_array[tgt_idx][0]
-            # DEBUG
-#            zero_pose = np.zeros((1,7))
-            zero_pose = np.zeros((1,11))
-            zero_pose[0] = 1.0
-            egomotion_data = np.insert(egomotion_data, max_offset, zero_pose, axis=0) 
             # DEBUG
             if tgt_idx % 100 == 0:
                 print("shape of egomotion_data: {}".format(egomotion_data.shape))
