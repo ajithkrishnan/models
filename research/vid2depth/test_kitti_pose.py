@@ -13,24 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 
-"""Generates depth estimates for an entire KITTI video."""
-
-# Example usage:
-#
-# python inference.py \
-#   --logtostderr \
-#   --kitti_dir ~/vid2depth/kitti-raw-uncompressed \
-#   --kitti_video 2011_09_26/2011_09_26_drive_0009_sync \
-#   --output_dir ~/vid2depth/inference \
-#   --model_ckpt ~/vid2depth/trained-model/model-119496
-#
-# python inference.py \
-#   --logtostderr \
-#   --kitti_dir ~/vid2depth/kitti-raw-uncompressed \
-#   --kitti_video test_files_eigen \
-#   --output_dir ~/vid2depth/inference \
-#   --model_ckpt ~/vid2depth/trained-model/model-119496
-#
+"""Generates egomotion estimates for an entire KITTI visual odom dataset."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -56,7 +39,7 @@ DEFAULT_KITTI_DIR = os.path.join(HOME_DIR, 'kitti-raw-uncompressed')
 DEFAULT_MODE = 'depth'
 
 flags.DEFINE_string('output_dir', DEFAULT_OUTPUT_DIR,
-                    'Directory to store estimated depth maps.')
+                        'Directory to store estimated depth maps.')
 flags.DEFINE_string('kitti_dir', DEFAULT_KITTI_DIR, 'KITTI dataset directory.')
 flags.DEFINE_string('model_ckpt', None, 'Model checkpoint to load.')
 flags.DEFINE_integer('kitti_sequence', None, 'KITTI video directory name.')
@@ -71,10 +54,8 @@ FLAGS = flags.FLAGS
 flags.mark_flag_as_required('kitti_sequence')
 flags.mark_flag_as_required('model_ckpt')
 
-CMAP = 'plasma'
 
-
-def _run_inference():
+def _run_egomotion_test():
   """Runs all images through depth model and saves depth maps."""
   ckpt_basename = os.path.basename(FLAGS.model_ckpt)
   ckpt_modelname = os.path.basename(os.path.dirname(FLAGS.model_ckpt))
@@ -139,16 +120,10 @@ def _run_inference():
         results = inference_model.inference(image_seq[None,:,:,:], sess, mode=FLAGS.mode)
 
         egomotion_data = results['egomotion'][0]
-        # Insert target poses
-        # DEBUG: check if the target pose is at the right index
-#        egomotion_data = np.insert(egomotion_data, 0, np.zeros((1,6)), axis=0) 
-#        egomotion_data = np.insert(egomotion_data, 2, np.zeros((1,6)), axis=0) 
         egomotion_data = np.insert(egomotion_data, max_offset, np.zeros((1,6)), axis=0) 
         curr_times = times[tgt_idx - max_offset:tgt_idx + max_offset + 1]
         egomotion_file = FLAGS.output_dir + '%.6d.txt' % (tgt_idx - max_offset)
-        # DEBUG
         dump_pose_seq_TUM(egomotion_file, egomotion_data, curr_times)
-#        inf_egomotion_f.write("%s\n" % (egomotion_path))
         #DEBUG
         if tgt_idx % 100 == 0:
             print("shape of image_seq: {}".format(image_seq.shape))
@@ -200,7 +175,7 @@ def is_valid_sample(frames, tgt_idx, seq_length):
 
 
 def main(_):
-  _run_inference()
+  _run_egomotion_test()
 
 
 if __name__ == '__main__':

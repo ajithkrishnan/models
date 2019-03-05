@@ -65,14 +65,9 @@ def _gen_data():
 
         for j, _ in enumerate(gt_list):
             gt_list[j] = [float(i) for i in gt_list[j]]
-            # DEBUG
-#            times.append(gt_list[j][0])
 
 #        max_offset = (FLAGS.seq_length - 1)//2
         gt_array = np.array(gt_list)
-        # DEBUG
-#        gt_array = np.delete(gt_array, 0 , axis=1)
-#        times = np.array(times)
       
         with open(FLAGS.kitti_dir + 'sequences/%.2d/times.txt' % FLAGS.kitti_sequence, 'r') as f:
             times = f.readlines()
@@ -96,10 +91,9 @@ def _gen_data():
                                             gt_array, 
                                             FLAGS.seq_length)
             # DEBUG
-            if tgt_idx % 100 == 0:
-                print("shape of egomotion_data: {}".format(egomotion_data.shape))
-                print("shape of gt_array: {}".format(gt_array.shape))
-            # DEBUG
+#            if tgt_idx % 100 == 0:
+#                print("shape of egomotion_data: {}".format(egomotion_data.shape))
+#                print("shape of gt_array: {}".format(gt_array.shape))
 #            egomotion_file = FLAGS.output_dir + '%.6d.txt' % (tgt_idx - max_offset)
 #            curr_times = times[tgt_idx - max_offset:tgt_idx + max_offset + 1]
             egomotion_file = FLAGS.output_dir + '%.6d.txt' % (tgt_idx)

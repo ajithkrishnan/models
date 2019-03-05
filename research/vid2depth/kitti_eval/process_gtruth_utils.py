@@ -113,11 +113,9 @@ def load_sequence(dataset_dir,
                         seq_length):
 #    max_offset = int((seq_length - 1)/2)
     max_offset = 1
-#    for o in range(-max_offset, max_offset+1):
     for o in range(0, max_offset + 2):
         curr_idx = tgt_idx + o
         curr_pose = gt_array[curr_idx]
-#        if o == -max_offset:
         if o == 0:
             pose_seq = curr_pose 
         else:
@@ -134,8 +132,6 @@ def is_valid_sample(frames, tgt_idx, seq_length):
     #TODO: calculate max_offset in a clean way 
 #    max_offset = (seq_length - 1)//2
     max_offset = 1
-#    min_src_idx = tgt_idx - max_offset
-#    max_src_idx = tgt_idx + max_offset
     min_src_idx = tgt_idx 
     max_src_idx = tgt_idx + 2*max_offset
     if min_src_idx < 0 or max_src_idx >= N:
