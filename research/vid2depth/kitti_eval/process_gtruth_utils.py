@@ -1,5 +1,5 @@
 import numpy as np
-from kitti_eval.pose_evaluation_utils import rot2quat
+from pose_evaluation_utils import rot2quat
 
 #DEBUG
 #def quat2rot(quaternion):
