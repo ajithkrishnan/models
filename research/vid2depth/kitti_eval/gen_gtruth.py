@@ -13,24 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 
-"""Generates depth estimates for an entire KITTI video."""
-
-# Example usage:
-#
-# python inference.py \
-#   --logtostderr \
-#   --kitti_dir ~/vid2depth/kitti-raw-uncompressed \
-#   --kitti_video 2011_09_26/2011_09_26_drive_0009_sync \
-#   --output_dir ~/vid2depth/inference \
-#   --model_ckpt ~/vid2depth/trained-model/model-119496
-#
-# python inference.py \
-#   --logtostderr \
-#   --kitti_dir ~/vid2depth/kitti-raw-uncompressed \
-#   --kitti_video test_files_eigen \
-#   --output_dir ~/vid2depth/inference \
-#   --model_ckpt ~/vid2depth/trained-model/model-119496
-#
+"""Generates ground truth data for evaluation."""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -41,150 +24,255 @@ from absl import app
 from absl import flags
 from absl import logging
 import matplotlib.pyplot as plt
-import model
 import numpy as np
-import scipy.misc
-import tensorflow as tf
-import util
-from kitti_eval.pose_evaluation_utils import dump_pose_seq_TUM
+#import util
+import csv
+from pose_evaluation_utils import rot2quat
+import math
 
-gfile = tf.gfile
+FLOAT_EPS = np.finfo(np.float).eps
 
 HOME_DIR = os.path.expanduser('~')
-DEFAULT_OUTPUT_DIR = os.path.join(HOME_DIR, 'vid2depth/inference')
-DEFAULT_KITTI_DIR = os.path.join(HOME_DIR, 'kitti-raw-uncompressed')
-DEFAULT_MODE = 'depth'
 
-flags.DEFINE_string('output_dir', DEFAULT_OUTPUT_DIR,
+flags.DEFINE_string('output_dir', None,
                     'Directory to store estimated depth maps.')
+flags.DEFINE_string('gt_dir', None, 'KITTI dataset directory.')
 flags.DEFINE_string('kitti_dir', DEFAULT_KITTI_DIR, 'KITTI dataset directory.')
-flags.DEFINE_string('kitti_video', None, 'KITTI video directory name.')
+flags.DEFINE_integer('kitti_sequence', None, 'KITTI video directory name.')
 flags.DEFINE_integer('seq_length', 3, 'Sequence length for each example.')
 
 FLAGS = flags.FLAGS
 
-flags.mark_flag_as_required('kitti_video')
+flags.mark_flag_as_required('gt_dir')
+flags.mark_flag_as_required('output_dir')
+flags.mark_flag_as_required('kitti_sequence')
 
-def _run_inference():
-  """Runs all images through depth model and saves depth maps."""
-  output_dir = FLAGS.output_dir
-  if not gfile.Exists(output_dir):
-    gfile.MakeDirs(output_dir)
 
-  inference_model = model.Model(is_training=False,
-                                seq_length=FLAGS.seq_length,
-                                batch_size=FLAGS.batch_size,
-                                img_height=FLAGS.img_height,
-                                img_width=FLAGS.img_width)
+def _gen_data():
 
-  sv = tf.train.Supervisor(logdir='/tmp/', saver=None)
+    # DEBUG
+#    gt_path = os.path.join(FLAGS.gt_dir, '%.2d_full.txt' % FLAGS.kitti_sequence)
+    gt_path = os.path.join(FLAGS.kitti_dir, 'poses/%.2d.txt' % FLAGS.kitti_sequence)
 
-  max_src_offset = (FLAGS.seq_length - 1)//2
+    if not os.path.exists(FLAGS.output_dir):
+        os.makedirs(FLAGS.output_dir)
 
-  with open(FLAGS.kitti_dir + 'sequences/%.2d/times.txt' % int(FLAGS.kitti_video), 'r') as f:
-      times = f.readlines()
-  times = np.array([float(s[:-1]) for s in times])
+    if os.path.exists(gt_path) :
+        gt_list = []
+        times = []
 
-  with sv.managed_session() as sess:
-    saver.restore(sess, FLAGS.model_ckpt)
-    if FLAGS.kitti_video == 'test_files_eigen':
-      im_files = util.read_text_lines(
-          util.get_resource_path('dataset/kitti/test_files_eigen.txt'))
-      im_files = [os.path.join(FLAGS.kitti_dir, f) for f in im_files]
-    else:
-      video_path = os.path.join(FLAGS.kitti_dir, 'sequences/', FLAGS.kitti_video)
-#      im_files = gfile.Glob(os.path.join(video_path, 'image_02/data', '*.png'))
-      im_files = gfile.Glob(os.path.join(video_path, 'image_2/', '*.png'))
-      im_files = [f for f in im_files if 'disp' not in f]
-      im_files = sorted(im_files)
+        with open(gt_path) as gt_file:
+            gt_list = list(csv.reader(gt_file, delimiter=' '))
 
-    egomotion_file = None    
-  
-    with gfile.Open(os.path.join(output_dir, 'inference.txt'), 'w') as inf_egomotion_f:
-      for i in range(0, len(im_files), FLAGS.batch_size):
-        if i % 100 == 0:
-          logging.info('Generating from %s: %d/%d', ckpt_basename, i,
-                      len(im_files))
+        for j, _ in enumerate(gt_list):
+            gt_list[j] = [float(i) for i in gt_list[j]]
+            # DEBUG
+#            times.append(gt_list[j][0])
 
-        inputs_depth = np.zeros(
-            (FLAGS.batch_size, FLAGS.img_height, FLAGS.img_width, 3),
-            dtype=np.uint8)
-        inputs_egomotion = np.zeros(
-            (FLAGS.batch_size, FLAGS.img_height, FLAGS.img_width *  FLAGS.seq_length, 3),
-            dtype=np.uint8)
-        
-        if FLAGS.mode == 'depth':
-            inputs = inputs_depth
-        elif FLAGS.mode == 'egomotion':
-            inputs = inputs_egomotion
+#        max_offset = (FLAGS.seq_length - 1)//2
+        gt_array = np.array(gt_list)
+        # DEBUG
+#        gt_array = np.delete(gt_array, 0 , axis=1)
+#        times = np.array(times)
+      
+        with open(FLAGS.kitti_dir + 'sequences/%.2d/times.txt' % int(FLAGS.kitti_video), 'r') as f:
+            times = f.readlines()
+        times = np.array([float(s[:-1]) for s in times])
 
-        for b in range(FLAGS.batch_size):
-          idx = i + b
-          if idx >= len(im_files):
-            break
-          im = scipy.misc.imread(im_files[idx])
+        test_frames = ['%.2d %.6d' % (int(FLAGS.kitti_sequence), n) for n in range(len(gt_list))]
+        max_offset = 1
 
-          if FLAGS.mode == 'depth':
-            inputs[b] = scipy.misc.imresize(im, (FLAGS.img_height, FLAGS.img_width))
-          elif FLAGS.mode == 'egomotion':
-            inputs[b] = scipy.misc.imresize(im, (FLAGS.img_height, 
-                FLAGS.img_width * FLAGS.seq_length))
-        
-        results = inference_model.inference(inputs, sess, mode=FLAGS.mode)
+        for tgt_idx in range(0, len(gt_list)):
 
-        for b in range(FLAGS.batch_size):
-          idx = i + b
-          if idx >= len(im_files):
-            break
+            if not is_valid_sample(test_frames, tgt_idx, FLAGS.seq_length):
+              continue
+            if tgt_idx % 100 == 0:
+              logging.info('Generating: %d/%d', tgt_idx,
+                          len(gt_list))
 
-          if FLAGS.mode == 'depth':
-              if FLAGS.kitti_video == 'test_files_eigen':
-                depth_path = os.path.join(output_dir, '%03d.png' % idx)
-              else:
-                depth_path = os.path.join(output_dir, '%04d.png' % idx)
-              depth_map = results['depth'][b]
-              depth_map = np.squeeze(depth_map)
-              colored_map = _normalize_depth_for_display(depth_map, cmap=CMAP)
-              input_float = inputs[b].astype(np.float32) / 255.0
-              vertical_stack = np.concatenate((input_float, colored_map), axis=0)
-              scipy.misc.imsave(depth_path, vertical_stack)
+            # TODO: currently assuming batch_size = 1
 
-          elif FLAGS.mode == 'egomotion':
-              for j in range(FLAGS.seq_length - 1):
-#                  if FLAGS.kitti_video == 'test_files_eigen':
-#                      egomotion_path = os.path.join(output_dir, '%i%d.txt' % (idx,j))
-#                  else:
-#                      egomotion_path = os.path.join(output_dir, '%04d.txt' % (idx+j))
+            egomotion_data = load_sequence(FLAGS.gt_dir, 
+                                            tgt_idx, 
+                                            gt_array, 
+                                            FLAGS.seq_length)
+
+            # Insert target poses
+            # DEBUG: check if the target pose is at the right index
+            #        egomotion_data = np.insert(egomotion_data, 0, np.zeros((1,6)), axis=0) 
+            #        egomotion_data = np.insert(egomotion_data, 2, np.zeros((1,6)), axis=0) 
+#            zero_pose = np.zeros((1,8))
+#            zero_pose[0][0] = gt_array[tgt_idx][0]
+            # DEBUG
+#            zero_pose = np.zeros((1,7))
+            zero_pose = np.zeros((1,11))
+            zero_pose[0] = 1.0
+            egomotion_data = np.insert(egomotion_data, max_offset, zero_pose, axis=0) 
+            # DEBUG
+            if tgt_idx % 100 == 0:
+                print("shape of egomotion_data: {}".format(egomotion_data.shape))
+                print("shape of gt_array: {}".format(gt_array.shape))
+            curr_times = times[tgt_idx - max_offset:tgt_idx + max_offset + 1]
+            egomotion_file = FLAGS.output_dir + '%.6d.txt' % (tgt_idx - max_offset)
+            dump_pose_seq_TUM(egomotion_file, egomotion_data, curr_times)
+#            #        egomotion_path = os.path.join(FLAGS.output_dir, str(egomotion_file))
+#            for j, g_row in enumerate(gt_list):
+#                with open(os.path.join(FLAGS.output_dir, '%.6d.txt' % j),'w') as f:
+#                    writer = csv.writer(f, delimiter=' ')
+#    #                writer.writerows(pose_seq)
+#                    writer.writerow(pose_seq)
+
+
+#DEBUG
+#def quat2rot(quaternion):
+#    """Return homogeneous rotation matrix from quaternion.
 #
-#                  egomotion_file = gfile.Open(egomotion_path, 'w')
-#                  egomotion_data = results['egomotion'][b]
-#                  egomotion_data = np.squeeze(egomotion_data)
-#                  egomotion_file.write(' '.join(str(d) for d in egomotion_data[j]))
+#    >>> M = quaternion_matrix([0.99810947, 0.06146124, 0, 0])
+#    >>> numpy.allclose(M, rotation_matrix(0.123, [1, 0, 0]))
+#    True
+#    >>> M = quaternion_matrix([1, 0, 0, 0])
+#    >>> numpy.allclose(M, numpy.identity(4))
+#    True
+#    >>> M = quaternion_matrix([0, 1, 0, 0])
+#    >>> numpy.allclose(M, numpy.diag([1, -1, -1, 1]))
+#    True
+#
+#    """
+#    q = np.array(quaternion, dtype=np.float64, copy=True)
+#    n = np.dot(q, q)
+##    if n < _EPS:
+##        return np.identity(4)
+#    q *= math.sqrt(2.0 / n)
+#    q = np.outer(q, q)
+#    return np.array([
+#        [1.0-q[2, 2]-q[3, 3],     q[1, 2]-q[3, 0],     q[1, 3]+q[2, 0]],
+#        [    q[1, 2]+q[3, 0], 1.0-q[1, 1]-q[3, 3],     q[2, 3]-q[1, 0]],
+#        [    q[1, 3]-q[2, 0],     q[2, 3]+q[1, 0], 1.0-q[1, 1]-q[2, 2]]])
 
-                  # DEBUG just an index or does it refer to the target frame
-                  tgt_idx = idx + j
-                  egomotion_data = results['egomotion'][0]
-                  # Insert target pose
-                  # DEBUG: check if the target pose is at the right index
-#                  egomotion_data = np.insert(egomotion_data, max_src_offset, np.zeros((1,6)), axis=0) 
-                  egomotion_data = np.insert(egomotion_data, 1, np.zeros((1,6)), axis=0) 
-#                  curr_times = times[tgt_idx - max_src_offset:tgt_idx + max_src_offset + 1]
-                  curr_times = times[tgt_idx - 1:tgt_idx + 1 + 1]
-                  #egomotion_file = output_dir + '%.6d.txt' % (tgt_idx - max_src_offset)
-                  egomotion_file = output_dir + '%.6d.txt' % (tgt_idx - 1)
-                  egomotion_path = os.path.join(FLAGS.output_dir, str(egomotion_file))
-                  print(egomotion_path)
-                  dump_pose_seq_TUM(egomotion_path, egomotion_data, curr_times)
-                  inf_egomotion_f.write("%s\n" % (egomotion_path))
 
-                  # DEBUG : confirm if this is needed
-#                  if egomotion_file is not None:
-#                      egomotion_file.close()
-     
+def quat2mat(q):
+    ''' Calculate rotation matrix corresponding to quaternion
+
+    Parameters
+    ----------
+    q : 4 element array-like
+
+    Returns
+    -------
+    M : (3,3) array
+      Rotation matrix corresponding to input quaternion *q*
+
+    Notes
+    -----
+    Rotation matrix applies to column vectors, and is applied to the
+    left of coordinate vectors.  The algorithm here allows non-unit
+    quaternions.
+
+    References
+    ----------
+    Algorithm from
+    http://en.wikipedia.org/wiki/Rotation_matrix#Quaternion
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> M = quat2mat([1, 0, 0, 0]) # Identity quaternion
+    >>> np.allclose(M, np.eye(3))
+    True
+    >>> M = quat2mat([0, 1, 0, 0]) # 180 degree rotn around axis 0
+    >>> np.allclose(M, np.diag([1, -1, -1]))
+    True
+    '''
+    w, x, y, z = q
+    Nq = w*w + x*x + y*y + z*z
+    if Nq < FLOAT_EPS:
+        return np.eye(3)
+    s = 2.0/Nq
+    X = x*s
+    Y = y*s
+    Z = z*s
+    wX = w*X; wY = w*Y; wZ = w*Z
+    xX = x*X; xY = x*Y; xZ = x*Z
+    yY = y*Y; yZ = y*Z; zZ = z*Z
+    return np.array(
+           [[ 1.0-(yY+zZ), xY-wZ, xZ+wY ],
+            [ xY+wZ, 1.0-(xX+zZ), yZ-wX ],
+            [ xZ-wY, yZ+wX, 1.0-(xX+yY) ]])
+
+
+def convert2mat(vec):
+    return np.array(
+            [[ vec[0], vec[1], vec[2] ],
+             [ vec[4], vec[5], vec[6] ],
+             [ vec[8], vec[9], vec[10] ]])
+
+def pose_vec_to_mat(vec):
+    tx = vec[0]
+    ty = vec[1]
+    tz = vec[2]
+    trans = np.array([tx, ty, tz]).reshape((3,1))
+#    rot = quat2mat([vec[6], vec[5], vec[4], vec[3]])
+    rot = convert2mat(vec)
+    Tmat = np.concatenate((rot, trans), axis=1)
+    hfiller = np.array([0, 0, 0, 1]).reshape((1,4))
+    Tmat = np.concatenate((Tmat, hfiller), axis=0)
+    return Tmat
+
+def dump_pose_seq_TUM(out_file, poses, times):
+    # Set first frame as the origin
+    first_origin = pose_vec_to_mat(poses[0])
+    with open(out_file, 'w') as f:
+        for p in range(len(times)):
+            this_pose = pose_vec_to_mat(poses[p])
+            this_pose = np.dot(first_origin, np.linalg.inv(this_pose))
+            tx = this_pose[0, 3]
+            ty = this_pose[1, 3]
+            tz = this_pose[2, 3]
+            rot = this_pose[:3, :3]
+            qw, qx, qy, qz = rot2quat(rot)
+            f.write('%f %f %f %f %f %f %f %f\n' % (times[p], tx, ty, tz, qx, qy, qz, qw))
+
+def load_sequence(dataset_dir, 
+                        tgt_idx, 
+                        gt_array, 
+                        seq_length):
+#    max_offset = int((seq_length - 1)/2)
+    max_offset = 1
+#    for o in range(-max_offset, max_offset+1):
+    # DEBUG: Dirty Fix
+    for o in range(0, 2):
+        curr_idx = tgt_idx + o
+        curr_pose = gt_array[curr_idx]
+#        if o == -max_offset:
+        if o == 0:
+            pose_seq = curr_pose 
+        else:
+            pose_seq = np.vstack((pose_seq, curr_pose))
+    return pose_seq
+
+
+def is_valid_sample(frames, tgt_idx, seq_length):
+    N = len(frames)
+
+    if tgt_idx >= N:
+      return False
+    tgt_drive, _ = frames[tgt_idx].split(' ')
+    #TODO: calculate max_offset in a clean way 
+#    max_offset = (seq_length - 1)//2
+    max_offset = 1
+    min_src_idx = tgt_idx - max_offset
+    max_src_idx = tgt_idx + max_offset
+    if min_src_idx < 0 or max_src_idx >= N:
+        return False
+    min_src_drive, _ = frames[min_src_idx].split(' ')
+    max_src_drive, _ = frames[max_src_idx].split(' ')
+    if tgt_drive == min_src_drive and tgt_drive == max_src_drive:
+        return True
+    return False
+
 
 def main(_):
-  _run_inference()
-
+  _gen_data()
 
 if __name__ == '__main__':
-  app.run(main)
+    app.run(main)

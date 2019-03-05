@@ -3,7 +3,6 @@ import os
 #import cv, cv2
 import argparse
 import tensorflow as tf
-from absl import logging
 import csv
 #from evaluation_utils import *
 

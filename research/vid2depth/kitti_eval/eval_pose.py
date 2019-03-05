@@ -4,7 +4,6 @@ import numpy as np
 import argparse
 from glob import glob
 from pose_evaluation_utils import *
-from absl import logging
 import csv
 
 parser = argparse.ArgumentParser()
@@ -30,8 +29,9 @@ def main():
 #            with open(os.path.join(args.gtruth_processed_dir, '%.6d.txt' % j),'w') as f:
 #                    writer = csv.writer(f, delimiter=' ')
 #                    writer.writerow(g_row)
+
     for i in range(len(pred_files)):
-        gtruth_file = args.gtruth_processed_dir + os.path.basename(pred_files[i])
+        gtruth_file = args.gtruth_dir + os.path.basename(pred_files[i])
         if not os.path.exists(gtruth_file):
             continue
         ate = compute_ate(gtruth_file, pred_files[i])
