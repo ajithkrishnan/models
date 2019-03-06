@@ -368,19 +368,36 @@ def pose_vec_to_mat(vec):
     Tmat = np.concatenate((Tmat, hfiller), axis=0)
     return Tmat
 
-def dump_pose_seq_TUM(out_file, poses, times):
+def dump_pose_seq_TUM(out_file, poses, times, fixed_origin, tgt_idx, plot=False):
     # First frame as the origin
-    first_origin = pose_vec_to_mat(poses[0])
-    with open(out_file, 'w') as f:
-        for p in range(len(times)):
-            this_pose = pose_vec_to_mat(poses[p])
-            # DEBUG: Dirty fix
-            if p == 2:
-                this_pose = np.linalg.inv(this_pose)
-            this_pose = np.dot(first_origin, np.linalg.inv(this_pose))
-            tx = this_pose[0, 3]
-            ty = this_pose[1, 3]
-            tz = this_pose[2, 3]
-            rot = this_pose[:3, :3]
-            qw, qx, qy, qz = rot2quat(rot)
-            f.write('%f %f %f %f %f %f %f %f\n' % (times[p], tx, ty, tz, qx, qy, qz, qw))
+    if plot:
+        first_origin = pose_vec_to_mat(fixed_origin)
+        with open(out_file, 'a') as f:
+            for p in range(len(times)):
+                if (tgt_idx-1) == 0 or p == 2:
+                    this_pose = pose_vec_to_mat(poses[p])
+                    # DEBUG: Dirty fix
+                    if p == 2:
+                        this_pose = np.linalg.inv(this_pose)
+                    this_pose = np.dot(first_origin, np.linalg.inv(this_pose))
+                    tx = this_pose[0, 3]
+                    ty = this_pose[1, 3]
+                    tz = this_pose[2, 3]
+                    rot = this_pose[:3, :3]
+                    qw, qx, qy, qz = rot2quat(rot)
+                    f.write('%f %f %f %f %f %f %f %f\n' % (times[p], tx, ty, tz, qx, qy, qz, qw))
+    else:
+        first_origin = pose_vec_to_mat(poses[0])
+        with open(out_file, 'w') as f:
+            for p in range(len(times)):
+                this_pose = pose_vec_to_mat(poses[p])
+                # DEBUG: Dirty fix
+                if p == 2:
+                    this_pose = np.linalg.inv(this_pose)
+                this_pose = np.dot(first_origin, np.linalg.inv(this_pose))
+                tx = this_pose[0, 3]
+                ty = this_pose[1, 3]
+                tz = this_pose[2, 3]
+                rot = this_pose[:3, :3]
+                qw, qx, qy, qz = rot2quat(rot)
+                f.write('%f %f %f %f %f %f %f %f\n' % (times[p], tx, ty, tz, qx, qy, qz, qw))

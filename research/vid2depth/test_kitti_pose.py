@@ -48,6 +48,7 @@ flags.DEFINE_integer('img_height', 128, 'Image height.')
 flags.DEFINE_integer('img_width', 416, 'Image width.')
 flags.DEFINE_integer('seq_length', 3, 'Sequence length for each example.')
 flags.DEFINE_string('mode', DEFAULT_MODE, 'Specify the network to run inference on i.e depth or pose' )
+flags.DEFINE_boolean('plot', False, 'Set format of output file')
 
 FLAGS = flags.FLAGS
 
@@ -59,6 +60,8 @@ def _run_egomotion_test():
   """Runs all images through depth model and saves depth maps."""
   ckpt_basename = os.path.basename(FLAGS.model_ckpt)
   ckpt_modelname = os.path.basename(os.path.dirname(FLAGS.model_ckpt))
+
+  fixed_origin = np.zeros((1,6))
 
   if not gfile.Exists(FLAGS.output_dir):
     gfile.MakeDirs(FLAGS.output_dir)
@@ -115,15 +118,20 @@ def _run_egomotion_test():
                                         FLAGS.seq_length, 
                                         FLAGS.img_height, 
                                         FLAGS.img_width)
-        
 
         results = inference_model.inference(image_seq[None,:,:,:], sess, mode=FLAGS.mode)
 
         egomotion_data = results['egomotion'][0]
-        egomotion_data = np.insert(egomotion_data, max_offset, np.zeros((1,6)), axis=0) 
         curr_times = times[tgt_idx - max_offset:tgt_idx + max_offset + 1]
-        egomotion_file = FLAGS.output_dir + '%.6d.txt' % (tgt_idx - max_offset)
-        dump_pose_seq_TUM(egomotion_file, egomotion_data, curr_times)
+        egomotion_data = np.insert(egomotion_data, max_offset, np.zeros((1,6)), axis=0) 
+        if FLAGS.plot: 
+            if (tgt_idx - 1) == 0:
+                fixed_origin = egomotion_data[0]
+            egomotion_file = FLAGS.output_dir + 'inference.txt' 
+            dump_pose_seq_TUM(egomotion_file, egomotion_data, curr_times, fixed_origin, tgt_idx, FLAGS.plot)
+        else:
+            egomotion_file = FLAGS.output_dir + '%.6d.txt' % (tgt_idx - max_offset)
+            dump_pose_seq_TUM(egomotion_file, egomotion_data, curr_times, np.zeros((1,6)), tgt_idx)
         #DEBUG
 #        if tgt_idx % 100 == 0:
 #            print("shape of image_seq: {}".format(image_seq.shape))
