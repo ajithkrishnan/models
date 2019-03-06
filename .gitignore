@@ -118,4 +118,7 @@ research/vid2depth/*.gz
 research/vid2depth/**/*.gz
 research/vid2depth/*.tar
 research/vid2depth/**/*.tar
+research/vid2depth/*.jpg
+research/vid2depth/*.jpeg
+research/vid2depth/*.png
 
