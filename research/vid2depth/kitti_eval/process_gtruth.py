@@ -24,7 +24,6 @@ from absl import app
 from absl import flags
 from absl import logging
 import numpy as np
-#import util
 import csv
 from process_gtruth_utils import dump_pose_seq_TUM, is_valid_sample, load_sequence
 import math
@@ -39,6 +38,7 @@ flags.DEFINE_string('gt_dir', None, 'KITTI groundtruth directory.')
 flags.DEFINE_string('kitti_dir', None, 'KITTI dataset directory.')
 flags.DEFINE_integer('kitti_sequence', None, 'KITTI video directory name.')
 flags.DEFINE_integer('seq_length', 3, 'Sequence length for each example.')
+flags.DEFINE_boolean('plot', False, 'Sets the mode to plot')
 
 FLAGS = flags.FLAGS
 
@@ -46,15 +46,20 @@ flags.mark_flag_as_required('gt_dir')
 flags.mark_flag_as_required('output_dir')
 flags.mark_flag_as_required('kitti_sequence')
 
+origin = []
 
 def _gen_data():
 
-    # DEBUG
-#    gt_path = os.path.join(FLAGS.gt_dir, '%.2d_full.txt' % FLAGS.kitti_sequence)
     gt_path = os.path.join(FLAGS.gt_dir, 'poses/%.2d.txt' % FLAGS.kitti_sequence)
 
-    if not os.path.exists(FLAGS.output_dir):
-        os.makedirs(FLAGS.output_dir)
+    if FLAGS.plot:
+        output_dir = FLAGS.output_dir[:-1] + '_plot/'
+    else:
+        output_dir = FLAGS.output_dir
+
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
 
     if os.path.exists(gt_path) :
         gt_list = []
@@ -76,29 +81,44 @@ def _gen_data():
         test_frames = ['%.2d %.6d' % (int(FLAGS.kitti_sequence), n) for n in range(len(gt_list))]
         max_offset = 1
 
-        for tgt_idx in range(0, len(gt_list)):
-
-            if not is_valid_sample(test_frames, tgt_idx, FLAGS.seq_length):
-              continue
-            if tgt_idx % 100 == 0:
-              logging.info('Generating: %d/%d', tgt_idx,
-                          len(gt_list))
-
-            # TODO: currently assuming batch_size = 1
-
+        if FLAGS.plot:
             egomotion_data = load_sequence(FLAGS.gt_dir, 
-                                            tgt_idx, 
+                                            0, 
                                             gt_array, 
-                                            FLAGS.seq_length)
-            # DEBUG
-#            if tgt_idx % 100 == 0:
-#                print("shape of egomotion_data: {}".format(egomotion_data.shape))
-#                print("shape of gt_array: {}".format(gt_array.shape))
-#            egomotion_file = FLAGS.output_dir + '%.6d.txt' % (tgt_idx - max_offset)
-#            curr_times = times[tgt_idx - max_offset:tgt_idx + max_offset + 1]
-            egomotion_file = FLAGS.output_dir + '%.6d.txt' % (tgt_idx)
-            curr_times = times[tgt_idx:tgt_idx + max_offset + 2]
+                                            FLAGS.seq_length,
+                                            FLAGS.plot)
+            curr_times = times[0:len(gt_array) + 1]
+
+            egomotion_file = output_dir + 'groundtruth.txt' 
             dump_pose_seq_TUM(egomotion_file, egomotion_data, curr_times)
+
+        else:
+
+            for tgt_idx in range(0, len(gt_list)):
+
+                if not is_valid_sample(test_frames, tgt_idx, FLAGS.seq_length):
+                  continue
+                if tgt_idx % 100 == 0:
+                  logging.info('Generating: %d/%d', tgt_idx,
+                              len(gt_list))
+
+                # TODO: currently assuming batch_size = 1
+
+                egomotion_data = load_sequence(FLAGS.gt_dir, 
+                                                tgt_idx, 
+                                                gt_array, 
+                                                FLAGS.seq_length,
+                                                FLAGS.plot)
+
+                curr_times = times[tgt_idx:tgt_idx + max_offset + 2]
+
+                if FLAGS.plot:
+                    egomotion_file = output_dir + 'groundtruth.txt' 
+                else:
+                    egomotion_file = output_dir + '%.6d.txt' % (tgt_idx)
+
+                dump_pose_seq_TUM(egomotion_file, egomotion_data, curr_times)
+
 
 
 def main(_):

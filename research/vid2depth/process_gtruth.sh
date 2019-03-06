@@ -8,4 +8,4 @@ python3 kitti_eval/process_gtruth.py \
     --kitti_dir $PATH_KITTI_GT/ \
     --gt_dir $PATH_KITTI_GT/ \
     --kitti_sequence 09 \
-    --seq_length 3
+    --seq_length 3 

@@ -93,6 +93,7 @@ def pose_vec_to_mat(vec):
     Tmat = np.concatenate((Tmat, hfiller), axis=0)
     return Tmat
 
+
 def dump_pose_seq_TUM(out_file, poses, times):
     # Set first frame as the origin
     first_origin = pose_vec_to_mat(poses[0])
@@ -110,10 +111,16 @@ def dump_pose_seq_TUM(out_file, poses, times):
 def load_sequence(dataset_dir, 
                         tgt_idx, 
                         gt_array, 
-                        seq_length):
+                        seq_length,
+                        plot=False):
 #    max_offset = int((seq_length - 1)/2)
     max_offset = 1
-    for o in range(0, max_offset + 2):
+    if not plot:
+        seq_lim = max_offset + 2
+    else:
+        seq_lim = len(gt_array) 
+
+    for o in range(0, seq_lim):
         curr_idx = tgt_idx + o
         curr_pose = gt_array[curr_idx]
         if o == 0:
