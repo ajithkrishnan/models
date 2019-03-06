@@ -15,17 +15,24 @@ args = parser.parse_args()
 
 def main():
 
-    pred_files = glob(args.pred_dir + '/*.txt')
+    pred_files = sorted(glob(args.pred_dir + '/*.txt'))
     ate_all = []
 
     for i in range(len(pred_files)):
         gtruth_file = args.gtruth_dir + os.path.basename(pred_files[i])
         if not os.path.exists(gtruth_file):
             continue
-        ate = compute_ate(gtruth_file, pred_files[i])
+        ate = compute_ate(gtruth_file, pred_files[i],True)
+        #DEBUG
+#        if i == 0:
+#            print("pred_file : {}".format(pred_files[i]))
+#            gtruth_file = args.gtruth_dir + os.path.basename(pred_files[i])
+#            print("gtruth_file : {}".format(gtruth_file))
+#            print("ATE all({}): {}".format(i, ate))
         if ate == False:
             continue
         ate_all.append(ate)
+
     ate_all = np.array(ate_all)
     print("Predictions dir: %s" % args.pred_dir)
     print("ATE mean: %.4f, std: %.4f" % (np.mean(ate_all), np.std(ate_all)))

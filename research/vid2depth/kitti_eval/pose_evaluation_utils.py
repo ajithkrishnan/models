@@ -4,7 +4,7 @@
 import math
 import numpy as np
 
-def compute_ate(gtruth_file, pred_file):
+def compute_ate(gtruth_file, pred_file, flag=False):
     gtruth_list = read_file_list(gtruth_file)
     pred_list = read_file_list(pred_file)
     matches = associate(gtruth_list, pred_list, 0, 0.01)

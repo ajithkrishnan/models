@@ -125,12 +125,12 @@ def _run_egomotion_test():
         egomotion_file = FLAGS.output_dir + '%.6d.txt' % (tgt_idx - max_offset)
         dump_pose_seq_TUM(egomotion_file, egomotion_data, curr_times)
         #DEBUG
-        if tgt_idx % 100 == 0:
-            print("shape of image_seq: {}".format(image_seq.shape))
-            print("shape of results['egomotion']: {}".format(results['egomotion'].shape))
-            print("shape of results['egomotion'][0]: {}".format(results['egomotion'][0].shape))
-            print("shape of egomotion_data: {}".format(egomotion_data.shape))
-            print("shape of curr_times: {}".format(curr_times.shape))
+#        if tgt_idx % 100 == 0:
+#            print("shape of image_seq: {}".format(image_seq.shape))
+#            print("shape of results['egomotion']: {}".format(results['egomotion'].shape))
+#            print("shape of results['egomotion'][0]: {}".format(results['egomotion'][0].shape))
+#            print("shape of egomotion_data: {}".format(egomotion_data.shape))
+#            print("shape of curr_times: {}".format(curr_times.shape))
 
 def load_image_sequence(dataset_dir, 
                         frames, 
