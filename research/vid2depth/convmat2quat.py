@@ -15,7 +15,6 @@ import numpy as np
 
 flags.DEFINE_string("input_dir", None, "Directory containing sequence files.")
 flags.DEFINE_string("output_dir", None, "Directory to which the processed output must be saved.")
-flags.DEFINE_integer("seq_length", 3, "Number of frames per sequence.")
 flags.DEFINE_string("file_type", None, "Specify if the data is groundtruth or prediction")
 
 FLAGS = flags.FLAGS
@@ -59,6 +58,10 @@ def _run_conversion():
 #    print(str(pose_full_seq.shape))
 #    print(len(times))
 
+    with open(FLAGS.input_dir + "poses/09.txt",  'r') as seq_file:
+        with open(FLAGS.input_dir + "sequences/09/times.txt",  'r') as times_file:
+            seq_array = np.array(list(csv.reader(seq_file, delimiter=' ')))
+            times_array = np.array(list(csv.reader(times_file, delimiter=' ')))
 
 
 def main(_):
