@@ -51,11 +51,7 @@ origin = []
 def _gen_data():
 
     gt_path = os.path.join(FLAGS.gt_dir, 'poses/%.2d.txt' % FLAGS.kitti_sequence)
-
-    if FLAGS.plot:
-        output_dir = FLAGS.output_dir[:-1] + '_plot/'
-    else:
-        output_dir = FLAGS.output_dir
+    output_dir = FLAGS.output_dir
 
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -82,15 +78,17 @@ def _gen_data():
         max_offset = 1
 
         if FLAGS.plot:
+            tgt_idx = 0
             egomotion_data = load_sequence(FLAGS.gt_dir, 
-                                            0, 
+                                            tgt_idx, 
                                             gt_array, 
                                             FLAGS.seq_length,
                                             FLAGS.plot)
             curr_times = times[0:len(gt_array) + 1]
+            num_curr_times = len(times[0:len(gt_array) + 1])
 
             egomotion_file = output_dir + 'groundtruth.txt' 
-            dump_pose_seq_TUM(egomotion_file, egomotion_data, curr_times)
+            dump_pose_seq_TUM(egomotion_file, egomotion_data, curr_times, FLAGS.plot)
 
         else:
 
@@ -107,18 +105,11 @@ def _gen_data():
                 egomotion_data = load_sequence(FLAGS.gt_dir, 
                                                 tgt_idx, 
                                                 gt_array, 
-                                                FLAGS.seq_length,
-                                                FLAGS.plot)
+                                                FLAGS.seq_length)
 
                 curr_times = times[tgt_idx:tgt_idx + max_offset + 2]
-
-                if FLAGS.plot:
-                    egomotion_file = output_dir + 'groundtruth.txt' 
-                else:
-                    egomotion_file = output_dir + '%.6d.txt' % (tgt_idx)
-
+                egomotion_file = output_dir + '%.6d.txt' % (tgt_idx)
                 dump_pose_seq_TUM(egomotion_file, egomotion_data, curr_times)
-
 
 
 def main(_):

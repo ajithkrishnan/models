@@ -79,9 +79,9 @@ def quat2mat(q):
 
 
 def pose_vec_to_mat(vec):
-    tx = vec[0]
-    ty = vec[1]
-    tz = vec[2]
+    tx = vec[3]
+    ty = vec[7]
+    tz = vec[11]
     trans = np.array([tx, ty, tz]).reshape((3,1))
 #    rot = quat2mat([vec[6], vec[5], vec[4], vec[3]])
     rot = np.array(
@@ -94,19 +94,32 @@ def pose_vec_to_mat(vec):
     return Tmat
 
 
-def dump_pose_seq_TUM(out_file, poses, times):
-    # Set first frame as the origin
-    first_origin = pose_vec_to_mat(poses[0])
-    with open(out_file, 'w') as f:
-        for p in range(len(times)):
-            this_pose = pose_vec_to_mat(poses[p])
-            this_pose = np.dot(first_origin, np.linalg.inv(this_pose))
-            tx = this_pose[0, 3]
-            ty = this_pose[1, 3]
-            tz = this_pose[2, 3]
-            rot = this_pose[:3, :3]
-            qw, qx, qy, qz = rot2quat(rot)
-            f.write('%f %f %f %f %f %f %f %f\n' % (times[p], tx, ty, tz, qx, qy, qz, qw))
+def dump_pose_seq_TUM(out_file, poses, times, plot=False):
+    if plot:
+        with open(out_file, 'w') as f:
+            for p in range(len(times)):
+                this_pose = pose_vec_to_mat(poses[p])
+                tx = this_pose[0, 3]
+                ty = this_pose[1, 3]
+                tz = this_pose[2, 3]
+                rot = this_pose[:3, :3]
+                qw, qx, qy, qz = rot2quat(rot)
+                f.write('%f %f %f %f %f %f %f %f\n' % (times[p], tx, ty, tz, qx, qy, qz, qw))
+
+    else:
+        # Set first frame as the origin
+        first_origin = pose_vec_to_mat(poses[0])
+        with open(out_file, 'w') as f:
+            for p in range(len(times)):
+                this_pose = pose_vec_to_mat(poses[p])
+#                this_pose = np.dot(first_origin, np.linalg.inv(this_pose))
+                this_pose = np.dot(this_pose, np.linalg.inv(first_origin))
+                tx = this_pose[0, 3]
+                ty = this_pose[1, 3]
+                tz = this_pose[2, 3]
+                rot = this_pose[:3, :3]
+                qw, qx, qy, qz = rot2quat(rot)
+                f.write('%f %f %f %f %f %f %f %f\n' % (times[p], tx, ty, tz, qx, qy, qz, qw))
 
 def load_sequence(dataset_dir, 
                         tgt_idx, 
@@ -115,12 +128,12 @@ def load_sequence(dataset_dir,
                         plot=False):
 #    max_offset = int((seq_length - 1)/2)
     max_offset = 1
-    if not plot:
-        seq_lim = max_offset + 2
-    else:
+    if plot:
         seq_lim = len(gt_array) 
+    else:
+        seq_lim = max_offset + 2
 
-    for o in range(0, seq_lim):
+    for o in range(seq_lim):
         curr_idx = tgt_idx + o
         curr_pose = gt_array[curr_idx]
         if o == 0:
@@ -133,6 +146,7 @@ def load_sequence(dataset_dir,
 def is_valid_sample(frames, tgt_idx, seq_length):
     N = len(frames)
 
+    #TODO: Remove unnecessary condition
     if tgt_idx >= N:
       return False
     tgt_drive, _ = frames[tgt_idx].split(' ')

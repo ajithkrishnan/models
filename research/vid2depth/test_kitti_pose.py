@@ -96,8 +96,7 @@ def _run_egomotion_test():
         times = f.readlines()
     times = np.array([float(s[:-1]) for s in times])
   
-    with gfile.Open(os.path.join(FLAGS.output_dir, 'inference.txt'), 'w') as inf_egomotion_f:
-      for tgt_idx in range(0, len(im_files)):
+    for tgt_idx in range(0, len(im_files)):
 
         if not is_valid_sample(test_frames, tgt_idx, FLAGS.seq_length):
           continue
@@ -110,7 +109,7 @@ def _run_egomotion_test():
             dtype=np.uint8)
         
 
-# TODO: currently assuming batch_size = 1
+    # TODO: currently assuming batch_size = 1
 
         image_seq = load_image_sequence(FLAGS.kitti_dir, 
                                         test_frames, 
@@ -165,6 +164,7 @@ def load_image_sequence(dataset_dir,
 def is_valid_sample(frames, tgt_idx, seq_length):
     N = len(frames)
 
+    #TODO: Remove unnecessary condition
     if tgt_idx >= N:
       return False
     tgt_drive, _ = frames[tgt_idx].split(' ')

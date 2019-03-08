@@ -379,6 +379,7 @@ def dump_pose_seq_TUM(out_file, poses, times, fixed_origin, tgt_idx, plot=False)
                     # DEBUG: Dirty fix
                     if p == 2:
                         this_pose = np.linalg.inv(this_pose)
+#                    this_pose = np.dot(this_pose, np.linalg.inv(first_origin))
                     this_pose = np.dot(first_origin, np.linalg.inv(this_pose))
                     tx = this_pose[0, 3]
                     ty = this_pose[1, 3]
@@ -394,6 +395,7 @@ def dump_pose_seq_TUM(out_file, poses, times, fixed_origin, tgt_idx, plot=False)
                 # DEBUG: Dirty fix
                 if p == 2:
                     this_pose = np.linalg.inv(this_pose)
+#                this_pose = np.dot(this_pose, np.linalg.inv(first_origin))
                 this_pose = np.dot(first_origin, np.linalg.inv(this_pose))
                 tx = this_pose[0, 3]
                 ty = this_pose[1, 3]
