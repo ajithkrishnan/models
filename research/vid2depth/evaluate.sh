@@ -3,9 +3,9 @@
 export PATH_VID2DEPTH=$(pwd)
 export PATH_KITTI_ODOM=$(pwd)/data
 
-python $PATH_VID2DEPTH/kitti_eval/eval_pose.py \
-    --pred_dir $PATH_VID2DEPTH/inference_evaluation_egomotion_reverse/ \
-    --gtruth_dir $PATH_KITTI_ODOM/dataset/ground_truth_processed_reverse/ 
+python3 $PATH_VID2DEPTH/kitti_eval/eval_pose.py \
+    --pred_dir $PATH_VID2DEPTH/inference_evaluation_egomotion_1103/ \
+    --gtruth_dir $PATH_KITTI_ODOM/dataset/ground_truth_processed/ 
 
 #    --gtruth_dir $PATH_KITTI_ODOM/pose_data_processed/ground_truth/
 #python $PATH_VID2DEPTH/kitti_eval/evaluate.py \

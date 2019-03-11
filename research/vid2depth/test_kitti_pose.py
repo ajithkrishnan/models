@@ -29,7 +29,7 @@ import numpy as np
 import scipy.misc
 import tensorflow as tf
 import util
-from kitti_eval.pose_evaluation_utils import dump_pose_seq_TUM
+from kitti_eval.pose_evaluation_utils import dump_pose_seq_TUM, is_valid_sample, load_image_sequence
 
 gfile = tf.gfile
 
@@ -62,9 +62,14 @@ def _run_egomotion_test():
   ckpt_modelname = os.path.basename(os.path.dirname(FLAGS.model_ckpt))
 
   fixed_origin = np.zeros((1,6))
+  
+  if FLAGS.plot:
+      output_dir = FLAGS.output_dir + "plot/"
+  else:
+      output_dir = FLAGS.output_dir  
 
-  if not gfile.Exists(FLAGS.output_dir):
-    gfile.MakeDirs(FLAGS.output_dir)
+  if not gfile.Exists(output_dir):
+    gfile.MakeDirs(output_dir)
   inference_model = model.Model(is_training=False,
                                 seq_length=FLAGS.seq_length,
                                 batch_size=FLAGS.batch_size,
@@ -89,8 +94,8 @@ def _run_egomotion_test():
 
     egomotion_file = None    
 
-#    max_offset = (FLAGS.seq_length - 1)//2
-    max_offset = 1
+    max_offset = (FLAGS.seq_length - 1)//2
+#    max_offset = 1
     test_frames = ['%.2d %.6d' % (FLAGS.kitti_sequence, n) for n in range(len(im_files))]
     with open(FLAGS.kitti_dir + 'sequences/%.2d/times.txt' % FLAGS.kitti_sequence, 'r') as f:
         times = f.readlines()
@@ -126,10 +131,10 @@ def _run_egomotion_test():
         if FLAGS.plot: 
             if (tgt_idx - 1) == 0:
                 fixed_origin = egomotion_data[0]
-            egomotion_file = FLAGS.output_dir + 'inference.txt' 
+            egomotion_file = output_dir + 'inference.txt' 
             dump_pose_seq_TUM(egomotion_file, egomotion_data, curr_times, fixed_origin, tgt_idx, FLAGS.plot)
         else:
-            egomotion_file = FLAGS.output_dir + '%.6d.txt' % (tgt_idx - max_offset)
+            egomotion_file = output_dir + '%.6d.txt' % (tgt_idx - max_offset)
             dump_pose_seq_TUM(egomotion_file, egomotion_data, curr_times, np.zeros((1,6)), tgt_idx)
         #DEBUG
 #        if tgt_idx % 100 == 0:
@@ -138,48 +143,6 @@ def _run_egomotion_test():
 #            print("shape of results['egomotion'][0]: {}".format(results['egomotion'][0].shape))
 #            print("shape of egomotion_data: {}".format(egomotion_data.shape))
 #            print("shape of curr_times: {}".format(curr_times.shape))
-
-def load_image_sequence(dataset_dir, 
-                        frames, 
-                        tgt_idx, 
-                        seq_length, 
-                        img_height, 
-                        img_width):
-#    max_offset = int((seq_length - 1)/2)
-    max_offset = 1
-    for o in range(-max_offset, max_offset+1):
-        curr_idx = tgt_idx + o
-        curr_drive, curr_frame_id = frames[curr_idx].split(' ')
-        img_file = os.path.join(
-            dataset_dir, 'sequences', '%s/image_2/%s.png' % (curr_drive, curr_frame_id))
-        curr_img = scipy.misc.imread(img_file)
-        curr_img = scipy.misc.imresize(curr_img, (img_height, img_width))
-        if o == -max_offset:
-            image_seq = curr_img
-        else:
-            image_seq = np.hstack((image_seq, curr_img))
-    return image_seq
-
-
-def is_valid_sample(frames, tgt_idx, seq_length):
-    N = len(frames)
-
-    #TODO: Remove unnecessary condition
-    if tgt_idx >= N:
-      return False
-    tgt_drive, _ = frames[tgt_idx].split(' ')
-    #TODO: calculate max_offset in a clean way 
-#    max_offset = (seq_length - 1)//2
-    max_offset = 1
-    min_src_idx = tgt_idx - max_offset
-    max_src_idx = tgt_idx + max_offset
-    if min_src_idx < 0 or max_src_idx >= N:
-        return False
-    min_src_drive, _ = frames[min_src_idx].split(' ')
-    max_src_drive, _ = frames[max_src_idx].split(' ')
-    if tgt_drive == min_src_drive and tgt_drive == max_src_drive:
-        return True
-    return False
 
 
 def main(_):

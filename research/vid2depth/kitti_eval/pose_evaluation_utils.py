@@ -2,7 +2,9 @@
 # https://vision.in.tum.de/data/datasets/rgbd-dataset/tools#absolute_trajectory_error_ate
 
 import math
+import os
 import numpy as np
+import scipy.misc
 
 def compute_ate(gtruth_file, pred_file, flag=False):
     gtruth_list = read_file_list(gtruth_file)
@@ -357,6 +359,48 @@ def euler2quat(z=0, y=0, x=0, isRadian=True):
                      cx*cz*sy - sx*cy*sz,
                      cx*cy*sz + sx*cz*sy])
 
+def load_image_sequence(dataset_dir, 
+                        frames, 
+                        tgt_idx, 
+                        seq_length, 
+                        img_height, 
+                        img_width):
+    max_offset = int((seq_length - 1)/2)
+#    max_offset = 1
+    for o in range(-max_offset, max_offset+1):
+        curr_idx = tgt_idx + o
+        curr_drive, curr_frame_id = frames[curr_idx].split(' ')
+        img_file = os.path.join(
+            dataset_dir, 'sequences', '%s/image_2/%s.png' % (curr_drive, curr_frame_id))
+        curr_img = scipy.misc.imread(img_file)
+        curr_img = scipy.misc.imresize(curr_img, (img_height, img_width))
+        if o == -max_offset:
+            image_seq = curr_img
+        else:
+            image_seq = np.hstack((image_seq, curr_img))
+    return image_seq
+
+
+def is_valid_sample(frames, tgt_idx, seq_length):
+    N = len(frames)
+
+    #TODO: Remove unnecessary condition
+    if tgt_idx >= N:
+      return False
+    tgt_drive, _ = frames[tgt_idx].split(' ')
+    #TODO: calculate max_offset in a clean way 
+    max_offset = (seq_length - 1)//2
+#    max_offset = 1
+    min_src_idx = tgt_idx - max_offset
+    max_src_idx = tgt_idx + max_offset
+    if min_src_idx < 0 or max_src_idx >= N:
+        return False
+    min_src_drive, _ = frames[min_src_idx].split(' ')
+    max_src_drive, _ = frames[max_src_idx].split(' ')
+    if tgt_drive == min_src_drive and tgt_drive == max_src_drive:
+        return True
+    return False
+
 def pose_vec_to_mat(vec):
     tx = vec[0]
     ty = vec[1]
@@ -372,13 +416,15 @@ def dump_pose_seq_TUM(out_file, poses, times, fixed_origin, tgt_idx, plot=False)
     # First frame as the origin
     if plot:
         first_origin = pose_vec_to_mat(fixed_origin)
+        if tgt_idx-1 == 0 and os.path.exists(out_file):
+            os.remove(out_file)
         with open(out_file, 'a') as f:
             for p in range(len(times)):
                 if (tgt_idx-1) == 0 or p == 2:
                     this_pose = pose_vec_to_mat(poses[p])
                     # DEBUG: Dirty fix
-                    if p == 2:
-                        this_pose = np.linalg.inv(this_pose)
+#                    if p == 2:
+#                        this_pose = np.linalg.inv(this_pose)
 #                    this_pose = np.dot(this_pose, np.linalg.inv(first_origin))
                     this_pose = np.dot(first_origin, np.linalg.inv(this_pose))
                     tx = this_pose[0, 3]
@@ -393,8 +439,8 @@ def dump_pose_seq_TUM(out_file, poses, times, fixed_origin, tgt_idx, plot=False)
             for p in range(len(times)):
                 this_pose = pose_vec_to_mat(poses[p])
                 # DEBUG: Dirty fix
-                if p == 2:
-                    this_pose = np.linalg.inv(this_pose)
+#                if p == 2:
+#                    this_pose = np.linalg.inv(this_pose)
 #                this_pose = np.dot(this_pose, np.linalg.inv(first_origin))
                 this_pose = np.dot(first_origin, np.linalg.inv(this_pose))
                 tx = this_pose[0, 3]

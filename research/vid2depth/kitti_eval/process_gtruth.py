@@ -51,7 +51,10 @@ origin = []
 def _gen_data():
 
     gt_path = os.path.join(FLAGS.gt_dir, 'poses/%.2d.txt' % FLAGS.kitti_sequence)
-    output_dir = FLAGS.output_dir
+    if FLAGS.plot:
+        output_dir = FLAGS.output_dir + 'plot/'
+    else:
+        output_dir = FLAGS.output_dir
 
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
